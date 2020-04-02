@@ -1,76 +1,61 @@
-const int HISTOGRAM_LENGTH = 512;
-
-void recordHistogram()  {
-  static uint16_t histogram[HISTOGRAM_LENGTH];
-  static uint32_t last_time;
-  uint32_t now = micros();
-  uint32_t dt = now - last_time;
-  uint32_t bin = dt / 4;  // resolution of micros() is 4 us
-  if (bin >= HISTOGRAM_LENGTH)
-      bin = HISTOGRAM_LENGTH - 1;
-  if (++histogram[bin] == UINT16_MAX) {
-      print_histogram(histogram);
-      exit(0);
-  }
-  last_time = now;
+void test_cyclic(float accel, int angle_distribution_num, int add_value_speed)  {
+   unsigned int max_speed = 50;
+   double add_angle = 1.5708/angle_distribution_num;
+   Serial.println("Acceleration; Motor0; Motor1; braking_distance");
+   while (!error) {
+    double rad = 0;
+    for (int i = 0; i < angle_distribution_num; i++)  {
+      test_single(accel,max_speed,rad,-230);
+      rad += add_angle;
+    }    
+    max_speed += add_value_speed;
+   } 
 }
 
-void print_histogram(uint16_t* histogram) {
-    Serial.println(F("t (us)  count"));
-    Serial.println(F("-------------"));
-    for (int i = 0; i < HISTOGRAM_LENGTH; i++) {
-        if (histogram[i] == 0) continue;  // skip zeros
-        Serial.print(i * 4);
-        Serial.print('\t');
-        Serial.println(histogram[i]);
-    }
-    Serial.println(F("-------------"));
-    Serial.flush();
-}
-
-
-void test_stop(double accel, double max_speed)  {
+void test_single(float accel, unsigned int max_speed, double rad, double start_Y)  {
   if (!error) {
-    Serial.println("Starting test stop");
-    positionControl=true;
-    double start_X = 80; double start_Y = 0;
-    setAccel(accel);
-    setMaximalSpeed(1000); 
-    setDesiredPosition(80,0);
-    while(!positionReached) {
-      evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
-      checkDriverError();
-      if (!error) {
-        updateRealSpeeds();
-      }   
+    homing_state = true;
+    setDefaultParams();
+    //Serial.println("Starting test stop");
+    
+    double start_X = 70;
+    setDesiredPosition(start_X,start_Y);
+    int positionReachedCount = 0;
+    while(distSqr(pos_X,pos_Y,start_X,start_Y) > POSITION_ERROR_TOLERANCE) {
+      loop(); 
     }
     positionControl = false;
+    setAccel(accel);
     setMaximalSpeed(max_speed); 
   
-    Serial.println("moving forward");
+    //Serial.println("moving forward");
+    setDesiredSpeedsXY(50000*cos(rad), 50000*sin(rad));
+    //print_desired_speeds();    
     
-    setNewDesiredSpeedsXY(max_speed, 0);
-    double stop_X = 300;
-    double speed_on_line;
-    while(pos_X < stop_X) {
+    while(abs(realSpeed[0]) < abs(desiredSpeed[0]) || abs(realSpeed[1]) < abs(desiredSpeed[1])) {
+      //Serial.println("--------------");
       loop();
+      //print_real_speeds();
+      //print_desired_speeds();
     }
+
+    int max_test_speed[2] = {realSpeed[0], realSpeed[1]};
+    double braking_pos[2] = {pos_X, pos_Y};
+    //Serial.println("braking_pos = " + String(braking_pos[0]) + " " + String(braking_pos[1]));
+    setDesiredSpeedsXY(0,0);
+    //print_real_speedsXY();
+    while(abs(realSpeed[0]) > 0.2 || abs(realSpeed[1]) > 0.2) {
+      loop();
+      //Serial.println("i = " + String(i));
+    }  
     
-    speed_on_line = realSpeed[0];
-    setNewDesiredSpeedsXY(0,0);
-  
-    for(int i = 0; i<8000; i++) {
-      evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
-      checkDriverError();
-      if (!error) {
-        updateRealSpeeds();
-      }   
-    }
-  
-    double diff = pos_X - stop_X;
-    Serial.println("Reached Speed = " + String(speed_on_line) + ". Braking distance for a = " + String(accel) + ", v = " + String(max_speed) + " is " + String(diff) + "mm.");
+    double braking_distance = distSqr(pos_X, pos_Y, braking_pos[0], braking_pos[1]);
+    Serial.println(String(accel) + ";" + String(max_test_speed[0]) + ";" + String(max_test_speed[1]) + ";" + String(braking_distance));
+    //print_pos();
+    setDefaultParams();
+    delay(10);
+    homing_state = true;
   }
   else
     Serial.println("Cant do test, because there has occured an error!");
-  
 }

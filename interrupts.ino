@@ -1,9 +1,26 @@
+
+
 void errorTrigger()  {
   error = true;
-  Serial.println("ERROR");
-  print_pos();
+  error_printed = false;
+  //Serial.println("ERROR");
+  //print_pos();
   setZeroSpeeds();
   detachInterrupts();
+}
+
+void checkDriverError() {
+  //Serial.println(bitRead(DRIVER_FLT_PIN,DRIVER_FLT_REGISTER_NUM));
+  int i = 0;
+  while ((!bitRead(DRIVER_FLT_0_PIN,DRIVER_FLT_0_REGISTER_NUM) || !bitRead(DRIVER_FLT_1_PIN,DRIVER_FLT_1_REGISTER_NUM)) && !error) {  // && !error_drivers
+    if (++i >= INDUCTION_CONSTANT_SWITCH)  {
+      error_drivers = true;
+      errorTrigger();
+      Serial.println("Driver error...");
+      return;
+    }
+  }
+  error_drivers = false;
 }
 
 void attachInterrupts()  {
@@ -21,7 +38,6 @@ void detachInterrupts() {
 void checkSwitchSlider2()  {
   int i = 0;
   while (!bitRead(SWITCH_SLIDER_2_PIN,SWITCH_SLIDER_2_REGISTER_NUM)) {
-
     if (++i >= INDUCTION_CONSTANT_SWITCH)  {
       //Serial.println("slider2 switch");
       switch_slider = true;
@@ -34,7 +50,6 @@ void checkSwitchSlider2()  {
 void checkSwitchMotor()  {
   int i = 0;
   while (!bitRead(SWITCH_MOTOR_PIN,SWITCH_MOTOR_REGISTER_NUM)) {
-    //Serial.println(i);
     if (++i >= INDUCTION_CONSTANT_SWITCH)  {
       //Serial.println("motor switch");
       switch_motor = true;
@@ -47,7 +62,6 @@ void checkSwitchMotor()  {
 void checkSwitchOthers()  {
   int i = 0;
   while (!bitRead(SWITCH_OTHERS_PIN,SWITCH_OTHERS_REGISTER_NUM)) {
-    //Serial.println(i);
     if (++i >= INDUCTION_CONSTANT_SWITCH)  {
       //Serial.println("others switch");
       switch_others = true;
@@ -57,12 +71,14 @@ void checkSwitchOthers()  {
   }
 }
 
-ISR(TIMER1_COMPA_vect)  { //Timer for motor 2
+ISR(TIMER1_COMPA_vect)  { //Timer for motor 1
+  //Serial.println("TIMER1_COMPA_vect, OCR1A = "+ String(OCR1A) +" Tim1_count = " + String(Tim1_count) + " Tim1_multiplier = " + String(Tim1_multiplier));
   if (direct[1] == 0 || error)
     return;
 
-  if(Tim1_count == Tim1_multiplier)  {
-    SET(PORTC, PUL2); // STEP X-AXIS (MOTOR1)
+  if(Tim1_count >= Tim1_multiplier)  {
+    //SET(PORTC, PUL2); // STEP X-AXIS (MOTOR1)
+    PORTC|=(1<<PUL2);
     pos_stepper[1] += direct[1];
     __asm__ __volatile__ (
     "nop" "\n\t"
@@ -77,7 +93,8 @@ ISR(TIMER1_COMPA_vect)  { //Timer for motor 2
     "nop" "\n\t"
     "nop" "\n\t"
     "nop");  // Wait for step pulse
-    CLR(PORTC, PUL2);
+    //CLR(PORTC, PUL2); CLR(x,y) (x&=(~(1<<y))) 
+    PORTC&=(~(1<<PUL2));
     Tim1_count = 0;
     OCR1A = (Tim1_multiplier == 0)? (Tim1_res_comp) : (65535);
     return;
@@ -91,12 +108,13 @@ ISR(TIMER1_COMPA_vect)  { //Timer for motor 2
   
 }
 
-ISR(TIMER3_COMPA_vect)  { //Timer for motor 1
+ISR(TIMER3_COMPA_vect)  { //Timer for motor 0
   if (direct[0] == 0 || error)
     return;
   
-  if(Tim3_count == Tim3_multiplier)  {
-    SET(PORTD, PUL1); // STEP X-AXIS (MOTOR1)
+  if(Tim3_count >= Tim3_multiplier)  {
+    //SET(PORTD, PUL1); // STEP X-AXIS (MOTOR1)
+    PORTD|=(1<<PUL1);
     pos_stepper[0] += direct[0];
     __asm__ __volatile__ (
     "nop" "\n\t"
@@ -111,27 +129,39 @@ ISR(TIMER3_COMPA_vect)  { //Timer for motor 1
     "nop" "\n\t"
     "nop" "\n\t"
     "nop");  // Wait for step pulse
-    CLR(PORTD, PUL1);
+    //CLR(PORTD, PUL1); 
+    PORTD&=(~(1<<PUL1));
     Tim3_count = 0;
     OCR3A = (Tim3_multiplier == 0)? (Tim3_res_comp) : (65535);
     return;
   }
-
+  
   else {
+    //Tim3_count++;
     if(++Tim3_count == Tim3_multiplier)   { 
       OCR3A = Tim3_res_comp;     
     } 
   }
 }
 
-//ISR(TIMER4_COMPA_vect)  { //Timer for sending serial data
-//  interrupts (); //alow other (motor) interrupts
-//  print_pos();
-//  print_real_speeds();
-//TCNT4=0;  
-//  interrupts();
-//  applyRealSpeed(0); 
-//  applyRealSpeed(1);
-//  realSpeedsApplied = true;
-//  TCNT4=0;
-//}
+ISR(TIMER4_COMPA_vect)  { //Timer for sending serial data
+  static int sent_X = 0; static int sent_Y = 0;
+  interrupts (); //alow other (motor) interrupts
+  if (error && !error_printed)  {
+    if (error_drivers) {
+      Serial.println("e1");      
+    }
+    else {
+      Serial.println("e0");
+    }
+    error_printed = true;
+  }
+  else if ((int)pos_X != sent_X || (int)pos_Y != sent_Y) {
+    sent_X = (int)pos_X; sent_Y = (int)pos_Y; 
+    Serial.println(String(sent_X) + "," + String(sent_Y) + ";" + String((int)realSpeedXY_mm[0]) + "," + String((int)realSpeedXY_mm[1]));
+    /*Serial.print(realSpeedXY_mm[0],0);
+    Serial.print(",");
+    Serial.println(realSpeedXY_mm[1],0);*/
+  }
+  TCNT4=0;  
+}

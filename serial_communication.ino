@@ -3,86 +3,108 @@ char home_keyword[]  = "home";
 char demo_keyword[]  = "demo";
 char demo2_keyword[]  = "demo2";
 char test_keyword[]  = "test";
+char cyclic_test_keyword[] = "cyclic_test";
 char position_keyword[]  = "p";
 char velocity_keyword[]  = "v";
 char motors_keyword[]  = "m";
 char preg_keyword[]  = "kpgain";
+char default_keyword[]  = "default";
 char set_acceleration_keyword[]  = "setaccel";
 char set_maxspeed_keyword[]  = "setmaxspeed";
 int control_mode = 3;
 char recievedChar;
 char * strtokIndx;
-char buf[80];
+char buf[20];
+
+//declare default params (arduino IDE doesn't support this in a classic way)
+void test_single(float accel, unsigned int max_speed, double rad = 0, double start_Y = 0);
 
 void checkSerialInput() {
-  if (readline(Serial.read(), buf, 80) > 0) {
+  strcpy(buf,"");
+  while (Serial.available())  {
+    readline(Serial.read(), buf, 80);
+  }
+  if ((buf[0] != NULL)) {
       // credit: https://forum.arduino.cc/index.php?topic=288234.0
       strtokIndx  = strtok(buf,",");  //parse buf into part ending with ","
-      if (strcmp(strtokIndx,home_keyword) == 0) {
-        homing(homing_state,error, positionControl);        
-      }
       
-//      else if (strcmp(strtokIndx,demo2_keyword) == 0) {
-//        demo2();        
-//      }
+      if (strcmp(strtokIndx,home_keyword) == 0) {
+        homing(homing_state,error, positionControl, switch_motor);        
+      }
       else if (strcmp(strtokIndx,position_keyword) == 0) {  // set new desired position
-         positionControl = true;
          //Serial.println("set new desired position");
          strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-         double value0 = atoi(strtokIndx);  //convert string to integer
+         float value0 = atof(strtokIndx);  //convert string to integer
          strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-         double value1 = atoi(strtokIndx);
+         float value1 = atof(strtokIndx);
          setDesiredPosition(value0,value1);    
       }
       else if (strcmp(strtokIndx,velocity_keyword) == 0) {  // set XY speed
          positionControl = false;
          //Serial.print("set XY speed: ");
          strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-         double value0 = atoi(strtokIndx);  //convert string to integer
+         float value0 = atof(strtokIndx);  //convert string to integer
          strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-         double value1 = atoi(strtokIndx);
-         Serial.println(String(value0) + " " + String(value1));
-         setNewDesiredSpeedsXY(value0, value1);       
+         float value1 = atof(strtokIndx);
+         //Serial.println("red speed in mm = " + String(value0) + " " + String(value1));
+         setDesiredSpeedsXY(value0, value1);       
       }
       else if (strcmp(strtokIndx,motors_keyword) == 0) {  // control motors speed
          positionControl = false;
          //Serial.print("control motors speed: ");
          strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-         double value0 = atoi(strtokIndx);  //convert string to integer
+         float value0 = atof(strtokIndx);  //convert string to integer
+         //value0 = mmToSteps(value0);
          strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-         double value1 = atoi(strtokIndx); 
-         //Serial.println(String(value0) + " " + String(value1));
-         setNewDesiredSpeedsMotors(value0, value1);       
+         float value1 = atof(strtokIndx);   
+         //value1 = mmToSteps(value1);
+         Serial.println("Setting motors speeds = " + String(value0) + " " + String(value1));   
+         setDesiredSpeedsMotors(value0, value1);       
       }
       else if (strcmp(strtokIndx,demo_keyword) == 0) {
         demo();        
       }
       else if (strcmp(strtokIndx,set_acceleration_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-        double value0 = atoi(strtokIndx);  //convert string to integer
-        setAccel(value0);  
+        float acc = atof(strtokIndx);  //convert string to integer
+        Serial.println("acc red =" + String(acc)); 
+        setAccel(acc);  
       }
       else if (strcmp(strtokIndx,set_maxspeed_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-        double value0 = atoi(strtokIndx);  //convert string to integer
+        float value0 = atof(strtokIndx);  //convert string to integer
         setMaximalSpeed(value0);  
+      }
+      else if (strcmp(strtokIndx,cyclic_test_keyword) == 0) {
+        strtokIndx = strtok(NULL, ","); //parse same strtokIndx
+        float acceleration = atof(strtokIndx);  //convert string to integer
+        strtokIndx = strtok(NULL, ","); //parse same strtokIndx
+        int rad_distrib_num = atoi(strtokIndx);  //convert string to integer
+        strtokIndx = strtok(NULL, ","); //parse same strtokIndx
+        int speed_add = atoi(strtokIndx);  //convert string to integer
+        test_cyclic(acceleration, rad_distrib_num, speed_add);   
       }
       else if (strcmp(strtokIndx,test_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-        double value0 = atoi(strtokIndx);  //convert string to integer
+        float acc = atof(strtokIndx);  //convert string to integer
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-        double value1 = atoi(strtokIndx); 
-        delay(10);
-        test_stop(value0, value1);  
+        unsigned int max_speed = atoi(strtokIndx); 
+        strtokIndx = strtok(NULL, ","); //parse same strtokIndx
+        double angle = atof(strtokIndx); 
+        //Serial.println("Angle = " + String(angle));
+        delay(5);
+        test_single(acc, max_speed, angle);  
       }
       else if (strcmp(strtokIndx,preg_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-        double value0 = atoi(strtokIndx);  //convert string to integer
+        unsigned int value0 = atoi(strtokIndx);  //convert string to integer
         setKpGain(value0);  
       }
-      print_pos();
+      else if (strcmp(strtokIndx,default_keyword) == 0) {
+        setDefaultParams();
+      }
+      //print_pos();
    }
-   
 }
 
 int readline(int readch, char *buffer, int len) {
@@ -90,43 +112,95 @@ int readline(int readch, char *buffer, int len) {
     int rpos;
     if (readch > 0) {
         switch (readch) {
+           default:
+              if (pos < len-1) {
+                  buffer[pos++] = readch;
+                  buffer[pos] = 0;
+              }
             case '\r': // Ignore CR
                 break;
             case '\n': // Return on new-line
                 rpos = pos;
                 pos = 0;  // Reset position index ready for next time
                 return rpos;
-            default:
-                if (pos < len-1) {
-                    buffer[pos++] = readch;
-                    buffer[pos] = 0;
-                }
+           
         }
     }
     return 0;
 }
 
-void setAccel(double _accel) {
-  if (_accel > 0 && _accel <= MAX_ALLOWED_ACCEL) {
-    MAX_ACCEL = _accel;
-    Serial.print("Setting accelertion = ");
-    Serial.println(MAX_ACCEL);
+void setAccel(float _accel_per1sec) {
+  //_accel_per1sec/=2.0;  //_accel_per1sec is acceleration for motor, not axis!!!!
+  if (_accel_per1sec > 0) {
+      ACCEL_PER1SEC = _accel_per1sec;
+      //Serial.println("ACCEL_PER1SEC = " + String(ACCEL_PER1SEC));
+      _accel_per1sec*=0.5;  //h-bot construction;
+      ACCEL = mmToSteps((float)((_accel_per1sec*CYCLE_DURATION)/1000000.0));
+      //Serial.print("Setting accelertion = ");
+      //Serial.println(ACCEL, 4);
+      pickCoefficients();
   }
   else 
-    Serial.println("Acceleration must be greater than 0!");
+    Serial.println("Acceleration must be greater than 0 and lower than " + String(MAX_ALLOWED_ACCEL_PER1SEC));
 }
 
-void setMaximalSpeed(double _maxspeed) {
-  if (_maxspeed > 0 && _maxspeed <= MAX_ALLOWED_SPEED) {
-    MAX_SPEED = _maxspeed;
-    Serial.print("Setting maximal speed = ");
-    Serial.println(MAX_SPEED);
+void setMaximalSpeed(float _maxspeed) {
+  MM_SPEED = _maxspeed;
+  _maxspeed = mmToSteps(_maxspeed);
+  //Serial.println(_maxspeed);
+  _maxspeed/=2; //max speed , XY coordinates is 2 times larger than max speed of motor
+  if (_maxspeed > 0) {
+    if (_maxspeed > MAX_MOTOR_ALLOWED_SPEED) {
+      MAX_MOTOR_SPEED = MAX_MOTOR_ALLOWED_SPEED;
+    }
+    else {
+      MAX_MOTOR_SPEED = _maxspeed;
+    }
+    //Serial.print("Setting maximal speed = ");
+    //Serial.println(MAX_MOTOR_SPEED);
   }
   else 
-    Serial.println("Max speed must be greater than 0!");
+    Serial.println("Max speed must be greater than 0 and lower than " + String(MAX_MOTOR_ALLOWED_SPEED));
 }
 
-void setKpGain(double _Kp) {
+void setKpGain(unsigned int _Kp) {
   if (_Kp > 0 && _Kp < MAX_KPGAIN)
     Kp = _Kp;
+}
+
+/*------------------------------------------------------------------------------------------------*/
+
+void print_pos()  {
+  Serial.print("Position X,Y: ");
+  Serial.println(String(pos_X) + " " + String(pos_Y));
+}
+
+void print_desired_pos()  {
+  Serial.print("Desired position X,Y: ");
+  Serial.println(String(desiredPosition[0]) + " " + String(desiredPosition[1]));
+}
+
+void print_steps()  {
+  Serial.print("Steppers steps 1,2: ");
+  Serial.println(String(pos_stepper[0]) + " " + String(pos_stepper[1]));
+}
+
+void print_real_speeds()  {
+  Serial.print("Real speeds: ");
+  Serial.println(String(realSpeed[0]) + " " + String(realSpeed[1]));
+}
+
+void print_real_speedsXY()  {
+  Serial.print("Real speeds XY: ");
+  Serial.println(String(realSpeedXY_mm[0]) + " " + String(realSpeedXY_mm[1]));
+}
+
+void print_desired_speeds()  {
+  Serial.print("Desired speeds: ");
+  Serial.println(String(desiredSpeed[0]) + " " + String(desiredSpeed[1]));
+}
+
+void print_error()  {
+  Serial.print("Error=");
+  Serial.println(error);
 }

@@ -4,22 +4,22 @@ void demo() {
   const int X_START = 190;
   const int Y_END = -70;
   const int Y_START = 70;
-  const int max_speed = MAX_SPEED; // max 8200
+  const int max_speed = MAX_MOTOR_SPEED; // max 8200
 
-  setNewDesiredSpeedsMotors(0,200);
+  setDesiredSpeedsMotors(0,200);
   print_pos();
   while (pos_X < 100) {
       updateRealSpeeds();
     if (!checkBarriers()) {
       setZeroSpeeds();
     }
-    evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
+    evaluatePos();
   }
 
   for (int i = 0; i<50 ;i++)  {
     Serial.print("Iteration: ");
     Serial.println(i);
-    setNewDesiredSpeedsMotors(-max_speed,max_speed);
+    setDesiredSpeedsMotors(-max_speed,max_speed);
     while (pos_X < X_END && !error) {
       updateRealSpeeds();
       if (!checkBarriers()) {
@@ -29,13 +29,13 @@ void demo() {
         print_steps();
         setZeroSpeeds();
       }
-      evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
+      evaluatePos();
     }
     /*Serial.println("1st line finished----------------------------------------------------");
     print_pos();
     Serial.println("---------------------------------------------------------------------");*/
     
-    setNewDesiredSpeedsMotors(max_speed,max_speed);
+    setDesiredSpeedsMotors(max_speed,max_speed);
     while (pos_Y > Y_END && !error) {
       updateRealSpeeds();
       if (!checkBarriers()) {
@@ -45,13 +45,13 @@ void demo() {
         print_steps();
         setZeroSpeeds();
       }
-      evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
+      evaluatePos();
     }
     /*Serial.println("2nd line finished----------------------------------------------------");
     print_pos();
     Serial.println("---------------------------------------------------------------------");*/
 
-    setNewDesiredSpeedsMotors(max_speed,-max_speed);
+    setDesiredSpeedsMotors(max_speed,-max_speed);
     while (pos_X > X_START && !error) {
       updateRealSpeeds();
       if (!checkBarriers()) {
@@ -61,13 +61,13 @@ void demo() {
         print_steps();
         setZeroSpeeds();
       }
-      evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
+         evaluatePos();
     }
     /*Serial.println("3rd line finished----------------------------------------------------");
     print_pos();
     Serial.println("---------------------------------------------------------------------");*/
   
-    setNewDesiredSpeedsMotors(-max_speed,-max_speed);
+    setDesiredSpeedsMotors(-max_speed,-max_speed);
     while (pos_Y < Y_START && !error) {
       updateRealSpeeds();
       if (!checkBarriers()) {
@@ -77,14 +77,14 @@ void demo() {
         print_steps();
         setZeroSpeeds();
       }
-      evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
+      evaluatePos();
     }
     /*Serial.println("4th line finished----------------------------------------------------");
     print_pos();
     Serial.println("---------------------------------------------------------------------");*/
   }
   resetDesiredPosition();
-  setNewDesiredSpeedsMotors(0,0);
+  setDesiredSpeedsMotors(0,0);
   Serial.println("Demo finished");
 }
 

@@ -2,64 +2,72 @@ template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
 }
 
-bool stepsToComp_1(float steps) { //converts steps to CPU comparator value, see https://www.youtube.com/watch?v=2kr5A350H7E
+bool stepsToComp(float steps, int& Tim_multiplier, uint16_t& Tim_res_comp)  {
   if (steps == minimal_speed) 
     return false;
-  unsigned long comp = (COMP_CONSTANT)/(steps);
-  Tim1_multiplier = (int) (comp / 65535);
-  Tim1_res_comp = (uint16_t) (comp - Tim1_multiplier*65535);
-  Tim1_count = 0;
+  unsigned long comp = (COMP_CONSTANT)/(steps);  
+  Tim_multiplier = (int) (comp / TIMER_LIMIT);
+  Tim_res_comp = (uint16_t) (comp - (long)Tim_multiplier*TIMER_LIMIT);
   return true;
 }
 
-bool stepsToComp_3(float steps) { //converts steps to CPU comparator value, see https://www.youtube.com/watch?v=2kr5A350H7E
-  //Serial.println("steps motor 0 = " + String(steps));
-  if (steps == minimal_speed) 
-    return false;
-  unsigned long comp = (COMP_CONSTANT)/(steps);
-  Tim3_multiplier = (int) (comp / 65535);
-  Tim3_res_comp = (uint16_t) (comp - Tim3_multiplier*65535);
-  Tim3_count = 0;
-  return true;
+void changeDirection(int i)  {
+  noInterrupts();
+  //delay(2);
+  if (i == 0) { //Motor 1
+    PORTD ^= (1 << DIR1);
+    TCNT3 = 0;
+    delayMicroseconds(5);    
+  }
+  else  { //Motor 2
+    PORTD ^= (1 << DIR2);
+    TCNT1 = 0;
+    delayMicroseconds(5); 
+  }
+  interrupts();
 }
 
-void setNewDesiredSpeedsXY(float v_x, float v_y)  {
-  realSpeedXY[0] = v_x; realSpeedXY[1] = v_y;
-  float v0 = (-v_x - v_y);
-  float v1 = (v_x - v_y);
+void resetDirections()  {
+  PORTD |= (1 << DIR1);
+  delayMicroseconds(5);
+  direct[0] = 0;
+  PORTD |= (1 << DIR2);
+  delayMicroseconds(5);
+  direct[1] = 0;
+  lastdirect[0] = 555;
+  lastdirect[1] = 555;
+}
 
-//  if (v0 != 0 && v1 !=0)  {
-//    Serial.println("-------------------");
-//    Serial.println("before clamp: ");
-//    Serial.println(v0);
-//    Serial.println(v1);
-//  }
-
+void setDesiredSpeedsXY(float v_x, float v_y)  {  
+  float v0 = mmToSteps(0.5*(-v_x - v_y));
+  float v1 = mmToSteps(0.5*(v_x - v_y));
+  
   //clamp by MAX_SPEED
-  if(abs(v0)>MAX_SPEED || abs(v1) > MAX_SPEED)  {
+  if(abs(v0)>MAX_MOTOR_SPEED || abs(v1) > MAX_MOTOR_SPEED)  {
     //Serial.println("clamping by MAXSPEED");
     float bigger = (abs(v0) > abs(v1)) ? (abs(v0)) : (abs(v1));
-    v0 = mapf(v0,-bigger,bigger, -MAX_SPEED, MAX_SPEED);
-    v1 = mapf(v1,-bigger,bigger, -MAX_SPEED, MAX_SPEED);
+    v0 = mapf(v0,-bigger,bigger, -MAX_MOTOR_SPEED, MAX_MOTOR_SPEED);
+    v1 = mapf(v1,-bigger,bigger, -MAX_MOTOR_SPEED, MAX_MOTOR_SPEED);
   }  
   
-//  if (!(v0 == 0 && v1 ==0))  {
-//    Serial.println("after clamp: ");
-//    Serial.println(v0);
-//    Serial.println(v1);
-//  }
-  setNewDesiredSpeedsMotors(v0,v1);
+  setDesiredSpeedsMotors(v0,v1);
 }
 
-void setNewDesiredSpeedsMotors(float v0, float v1)  {
-//  beforeSpeed[0] = realSpeed[0];
+void updateRealSpeedXY_mm() {
+  //print_real_speeds();
+  realSpeedXY_mm[0] = stepsTomm(-realSpeed[0]+realSpeed[1]); 
+  realSpeedXY_mm[1] = stepsTomm(-realSpeed[0]-realSpeed[1]);
+  //print_real_speedsXY();
+}
+
+void setDesiredSpeedsMotors(float v0, float v1)  {
   desiredSpeed[0]= v0;
-  //beforeSpeed[1] = realSpeed[1];
   desiredSpeed[1]= v1;
+  //Serial.println("Setting motors speed to " + String(v0) + ", " + String(v1));
 }
 
 void setZeroSpeeds()  {
-  setNewDesiredSpeedsMotors(0,0);
+  setDesiredSpeedsMotors(0,0);
   realSpeed[0] = 0;
   realSpeed[1] = 0; 
   allowedSpeed[0] = false;
@@ -70,13 +78,14 @@ void setZeroSpeeds()  {
   //absrealSpeed[1] = 0;
   resetDirections();
   
-  OCR1A = 65535;
-  OCR3A = 65535;
+  OCR1A = TIMER_LIMIT;
+  OCR3A = TIMER_LIMIT;
   delay(10);
 }
 
 void setDesiredPosition(float x, float y)  {
   positionReached = false;
+  positionControl=true;
   desiredPosition[0] = x;
   desiredPosition[1] = y;
 }
@@ -114,52 +123,64 @@ void updatePositionSpeeds() {
   float error = diff_x*diff_x + diff_y*diff_y;
   if (error < POSITION_ERROR_TOLERANCE)  {
     //Serial.println("We reached the target");
-    setNewDesiredSpeedsXY(0,0);
-    positionReached = true;
+    setDesiredSpeedsXY(0,0);
+    //positionReached = true;
   }
   else  {
     //Serial.println("We havent reached the target yet");
-    setNewDesiredSpeedsXY(Kp*diff_x,Kp*diff_y);
+    setDesiredSpeedsXY(Kp*diff_x,Kp*diff_y);
   }
 }
 
-float minDistToWall()  {
-  float x_hit; float y_hit; float tgAlpha;
-  tgAlpha = realSpeedXY[1]/realSpeedXY[0];
-  if (realSpeedXY[0] > minimal_speed/2) {    
+void setDefaultParams() {
+  setAccel(ACCEL_PER1SEC_DEF);
+  setMaximalSpeed(MM_SPEED_DEF);
+  setKpGain(Kp_DEF);
+}
+
+double minDistToWall()  {
+  double x_hit; double y_hit; double tgAlpha;
+  tgAlpha = realSpeedXY_mm[1]/realSpeedXY_mm[0];
+  if (realSpeedXY_mm[0] >= 0) {    
     //Serial.println("pos_Y = " + String(pos_Y));
     //Serial.println("pos_X = " + String(pos_X));
-    float x0 = BARRIER_X_MAX - pos_X;
+    double x0 = BARRIER_X_MAX - pos_X;
     //Serial.println("x0 = " + String(x0));
     //Serial.println("tgAlpha = " + String(tgAlpha));
-    float y0 = x0*tgAlpha;
+    double y0 = x0*tgAlpha;
     //Serial.println("y0 = " + String(y0));
-    float y0_tot = y0 + pos_Y;
+    double y0_tot = y0 + pos_Y;
     //Serial.println("y0_tot = " + String(y0_tot));
     //Serial.println("------------");
-    if (y0_tot > BARRIER_Y_MAX) { //hitting upper X line
-//      Serial.println("upper");
+    if (isnan(y0_tot)) {
+      return 80000;
+    }
+    else if (y0_tot > BARRIER_Y_MAX) { //hitting upper X line
+      //Serial.println("upper");
       y_hit = BARRIER_Y_MAX;
       x_hit = BARRIER_X_MAX - (y0_tot - BARRIER_Y_MAX)/tgAlpha;
     }
     else if (y0_tot < BARRIER_Y_MIN)  { //hitting lower X line
-//      Serial.println("lower");
+      //Serial.println("lower");
       y_hit = BARRIER_Y_MIN;
       x_hit = BARRIER_X_MAX - (y0_tot - BARRIER_Y_MIN)/tgAlpha;
     }
     else  { //hitting X_MAX line
-//      Serial.println("back");
+      //Serial.println("back");
       x_hit = BARRIER_X_MAX;
       y_hit = y0_tot;
     }
   }
   else  {
-    float x0 = pos_X - BARRIER_X_MIN;
-    float y0 = -x0*tgAlpha;
-    float y0_tot = y0 + pos_Y;
+    double x0 = pos_X - BARRIER_X_MIN;
+    double y0 = -x0*tgAlpha;
+    double y0_tot = y0 + pos_Y;
     //Serial.println("y0_tot = " + String(y0_tot));
     //Serial.println("------------");
-    if (y0_tot > BARRIER_Y_MAX) { //hitting upper X line
+    if (isnan(y0_tot)) {
+      return 80000;
+    }
+    else if (y0_tot > BARRIER_Y_MAX) { //hitting upper X line
       //Serial.println("upper");
       y_hit = BARRIER_Y_MAX;
       x_hit = BARRIER_X_MIN - (y0_tot - BARRIER_Y_MAX)/tgAlpha;
@@ -178,84 +199,99 @@ float minDistToWall()  {
   
   if (isnan(x_hit)) 
     x_hit = pos_X;
+
+  
+  double distToWall = distSqr(pos_X, pos_Y, x_hit, y_hit);
+  if (isnan(distToWall) || distToWall < 0) 
+    distToWall = 80000;
     
-  double distToWall = sqrt((pos_X - x_hit)*(pos_X - x_hit) + (pos_Y - y_hit)*(pos_Y - y_hit));
-  if (isnan(distToWall)) 
-    distToWall = 10000;
-    
-  Serial.println("Intersect point = [" + String(x_hit) + ", " + String(y_hit) + "]");
-  Serial.println("Dist to wall = " + String(distToWall));
+  //Serial.println("Intersect point = [" + String(x_hit) + ", " + String(y_hit) + "]");
+  //Serial.println("Dist to wall = " + String(distToWall));
   
   return distToWall;
-  
 }
 
-double allowedDist(double acceleration, double realSpeedMagnitude)  {
-  
+
+
+double distSqr(double x1, double y1, double x2, double y2) {
+  return (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2);
 }
 
-void limitDesiredSpeeds() {
-  //double allowed_dist = allowedDist();
-  float min_dist = minDistToWall();
-  
-//  Serial.println("Speeds XY:");
-//  Serial.println(realSpeedXY[0]);
-//  Serial.println(realSpeedXY[1]);
-//  Serial.println("______");
-  
+void preventWallCollision() {
+  double critical_dist = criticalDist(realSpeed[0], realSpeed[1]);
+  double dist = minDistToWall();
+  //Serial.println("critical_dist = " + String(critical_dist)); 
+  //Serial.println("dist = " + String(dist)); 
+  if (critical_dist > dist) {
+    //Serial.println("critical_dist = " + String(critical_dist)); 
+    //Serial.println("Critical distance. Setting speed to 0.");
+    setDesiredSpeedsXY(0,0);
+    positionControl = false;
+  }  
 }
 
 /*===========================================================================================*/
 void updateRealSpeeds() {   
   
-  if (positionControl && !positionReached) { //positionControl 
+  if (positionControl) { // && !positionReached) { //positionControl 
       updatePositionSpeeds();
-    }
-
-  limitDesiredSpeeds();
-  
-  float max_accel[2];
-  float speed_diff[2];
-  speed_diff[0] = abs(realSpeed[0] - desiredSpeed[0]);
-  speed_diff[1] = abs(realSpeed[1] - desiredSpeed[1]);
-
-  //clamp by MAX_SPEED while keeping the ratio of accels
-  float highest_speed = (speed_diff[0] > speed_diff[1]) ? (speed_diff[0]) : (speed_diff[1]);
-  max_accel[0] = mapf(speed_diff[0],0 ,highest_speed, 0, MAX_ACCEL);
-  max_accel[1] = mapf(speed_diff[1],0 ,highest_speed, 0, MAX_ACCEL);
-
-  
-  for (int i = 0; i < 2; i++) {
-    speedToCompare[i] = realSpeed[i];
-    
-    if (abs(realSpeed[i] - desiredSpeed[i]) < SPEED_IN_TOLERANCE) {   // we are roughly on desired speed -> set directly desired speed
-      realSpeed[i] = desiredSpeed[i];
-      //Serial.println("we are there, realspeed = " + String(realSpeed[1]) + " ,desired speed = " +String(desiredSpeed[1]));
-      //Serial.println(realSpeed[1] - desiredSpeed[1]);
-    }
-    else  {
-      if (oppositeSignsAdvanced(realSpeed[i], desiredSpeed[i]))  {      //desired speed is opposite or zero -> go to zero
-        realSpeed[i] += (realSpeed[i] > 0)? (-max_accel[i]) : (max_accel[i]);
-      }
-      
-      else  {
-        if (abs(realSpeed[i]) < abs(desiredSpeed[i])) { //go faster
-          realSpeed[i] += (desiredSpeed[i] > 0)? (max_accel[i]) : (-max_accel[i]);
-        }
-        else  {                             //go slower
-          realSpeed[i] += (desiredSpeed[i] > 0)? (-max_accel[i]) : (+max_accel[i]);
-        }
-      }  
-    }
   }
 
-  applyRealSpeed0(); 
-  applyRealSpeed1(); 
+  if (!homing_state)  {
+    preventWallCollision();
+  }
+  
+  float accel[2] = {(float)ACCEL,(float)ACCEL};
+  float speed_diff[2];
+  speed_diff[0] = abs(realSpeed[0] - desiredSpeed[0]);
+  speed_diff[1] = abs(realSpeed[1] - desiredSpeed[1]);  
+  speedToCompare[0] = realSpeed[0];
+  speedToCompare[1] = realSpeed[1];
+  //Serial.println("speed_diff = " + String(speed_diff[0]) + ", " + String(speed_diff[1]));
+
+  if (!(speed_diff[0] < 1 && speed_diff[1] < 1)) {
+    float highest_speed = (speed_diff[0] > speed_diff[1]) ? (speed_diff[0]) : (speed_diff[1]);
+    //Serial.println("--------");  
+    for (int i = 0; i < 2; i++) {
+      accel[i] = mapf(speed_diff[i],0 ,highest_speed, 0, ACCEL);
+      //Serial.println("accel[" + String(i) + "] = " + String(accel[i]));
+      
+      if (abs(realSpeed[i] - desiredSpeed[i]) < accel[i]+1) {   // we are roughly on desired speed -> set directly desired speed
+        realSpeed[i] = desiredSpeed[i];
+        //Serial.println("we are there, realspeed = " + String(realSpeed[1]) + " ,desired speed = " +String(desiredSpeed[1]));
+        //Serial.println(realSpeed[1] - desiredSpeed[1]);
+      }
+      else  {
+        if (oppositeSignsAdvanced(realSpeed[i], desiredSpeed[i]))  {      //desired speed is opposite or zero -> go to zero
+          realSpeed[i] += (realSpeed[i] > 0)? (-accel[i]) : (accel[i]);
+        }
+        
+        else  {
+          if (abs(realSpeed[i]) < abs(desiredSpeed[i])) { //go faster
+            realSpeed[i] += (desiredSpeed[i] > 0)? (accel[i]) : (-accel[i]);
+          }
+          else  {                             //go slower
+            realSpeed[i] += (desiredSpeed[i] > 0)? (-accel[i]) : (+accel[i]);
+          }
+        }  
+      }
+    }
+  }
+}
+
+void applyRealSpeeds() {
+  updateRealSpeedXY_mm();
+  if (realSpeed[0] != speedToCompare[0]) {
+    applyRealSpeed0(); 
+  }
+  if (realSpeed[1] != speedToCompare[1]) {
+    applyRealSpeed1(); 
+  }
 }
 
 void applyRealSpeed0(){
-  if (realSpeed[0] != speedToCompare[0]) {
-      bool moving = stepsToComp_3(abs(realSpeed[0]));
+  //if (realSpeed[0] != speedToCompare[0]) {
+      bool moving = stepsToComp(abs(realSpeed[0]), Tim3_multiplier, Tim3_res_comp);
       //Serial.print("compare value: ");
       //Serial.println(comp);
       if (!moving) {  //not moving
@@ -268,10 +304,10 @@ void applyRealSpeed0(){
         direct[0] = (realSpeed[0] > 0)? (1) : (-1);
       }
   
-      OCR3A = (Tim3_multiplier == 0)? (Tim3_res_comp) : (65535);
+      OCR3A = (Tim3_multiplier == 0)? (Tim3_res_comp) : (TIMER_LIMIT);
       // Check  if we need to reset the timer...
       if (TCNT3 > OCR3A)
-        TCNT3 = 0;
+        TCNT3 = OCR3A-1;
 
       if (oppositeSigns(realSpeed[0], speedToCompare[0]))  {  //if we are crossing zero speed
             //Serial.println("changing direction while accelerating");
@@ -292,13 +328,13 @@ void applyRealSpeed0(){
           changeDirection(0);
         }
       }
-    }
+    //}
 }
 
 void applyRealSpeed1(){
-  if (realSpeed[1] != speedToCompare[1]) {
-      bool moving = stepsToComp_1(abs(realSpeed[1]));
-      //Serial.print("compare value: ");
+  //if (realSpeed[1] != speedToCompare[1]) {
+      bool moving = stepsToComp(abs(realSpeed[1]), Tim1_multiplier, Tim1_res_comp);
+      //Serial.println("compare value: ");
       //Serial.println(comp);
       if (!moving) {  //not moving
         if (direct[1] != 0) {
@@ -310,10 +346,10 @@ void applyRealSpeed1(){
         direct[1] = (realSpeed[1] > 0)? (1) : (-1);
       }
 
-      OCR1A = (Tim1_multiplier == 0)? (Tim1_res_comp) : (65535);
+      OCR1A = (Tim1_multiplier == 0)? (Tim1_res_comp) : (TIMER_LIMIT);
       // Check  if we need to reset the timer...
       if (TCNT1 > OCR1A)
-        TCNT1 = 0;
+        TCNT1 = OCR1A-1;
 
       
       if (oppositeSigns(realSpeed[1], speedToCompare[1]))  {  //if we are crossing zero speed
@@ -336,5 +372,5 @@ void applyRealSpeed1(){
           changeDirection(1);
         }
       }
-    }
+    //}
 }

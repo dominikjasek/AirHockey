@@ -1,20 +1,39 @@
-void homing(bool& homing_state, bool& error, bool& positionControl)  {
+void loopWithoutSerial()  {
+  evaluatePos();
+  checkDriverError();
+  if (!error) {
+    updateRealSpeeds();
+  } 
+  while((micros()-t)<CYCLE_DURATION){}  //wait
+  applyRealSpeeds();
+  t = micros();
+}
+
+void homing(bool& homing_state, bool& error, bool& positionControl,volatile bool& switch_motor)  {
+  const float mm_speed_restore = MM_SPEED;
+  const float accel_per1sec_restore = ACCEL_PER1SEC; 
+  //Serial.println("mm_speed_restore = " + String(mm_speed_restore));
+  //Serial.println("accel_restore = " + String(accel_per1sec_restore));
+  const int homing_speed = 180; //mm/s
+  const int accelper1sec = 1200; //mm/s^2
   setZeroSpeeds();
   delay(10);
-  setDefaultParams();
+  setMaximalSpeed(homing_speed);
+  setAccel(accelper1sec);
+  //setDefaultParams();
   if (!error_drivers) {
     detachInterrupts();
-    int homing_speed = 700; 
+    
     homing_state = true; switch_slider = false; 
     //bool prev_positionControl = positionControl;  //turn off positionControl for homing
     positionControl = false;
     
-    if (switch_motor) { //pusher has hit motor switch, go forward a bit to prevent hitting corner of goal in case it is inside
+    if (switch_motor == true) { //pusher has hit motor switch, go forward a bit to prevent hitting corner of goal in case it is inside
       switch_motor = false;
-      setNewDesiredSpeedsMotors(-homing_speed,homing_speed);
+      setDesiredSpeedsXY(homing_speed,0);
       error = false; 
-      for (int i =0;i<1000;i++){
-        updateRealSpeeds();  
+      for (int i =0;i<250;i++){
+        loopWithoutSerial();
       }
     }
     
@@ -23,37 +42,36 @@ void homing(bool& homing_state, bool& error, bool& positionControl)  {
     error = false; 
     Serial.println("Homing start");
     Serial.println("Homing Y axis");
-    setNewDesiredSpeedsMotors(-homing_speed,-homing_speed);
+    setDesiredSpeedsXY(0,homing_speed);
     while(!switch_slider) {
-      updateRealSpeeds();
+      loopWithoutSerial();
     }  
     setZeroSpeeds();
       
     
     Serial.println("Homing X axis");
-    setNewDesiredSpeedsMotors(homing_speed,-homing_speed);
+    setDesiredSpeedsXY(-homing_speed,0);
     detachInterrupt(digitalPinToInterrupt(SWITCH_SLIDER_2));
     attachInterrupt(digitalPinToInterrupt(SWITCH_MOTOR), checkSwitchMotor, LOW);
     error = false;
     while(!switch_motor) {
-      updateRealSpeeds(); 
+      loopWithoutSerial();
     }
     
     setZeroSpeeds();
   
     resetPosition();  
-    setNewDesiredSpeedsMotors(0,homing_speed);
+    setDesiredSpeedsXY(homing_speed/2,-homing_speed/2);
     Serial.println("Moving to default position");
     error = false;
     delay(10);
     while (pos_X < 80){
-      loop(); 
-    }
-    
-    error = true;    
-  
+      loopWithoutSerial();
+    }    
+    //error = true;      
     setZeroSpeeds();
-    //resetPosition();
+    setMaximalSpeed(mm_speed_restore);
+    setAccel(accel_per1sec_restore);
     resetDesiredPosition();
     attachInterrupts();
     error = false; switch_motor = false; switch_slider = false; error_drivers = false;
