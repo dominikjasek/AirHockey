@@ -11,7 +11,7 @@
 // pulses needed for 1 rotation = 400 pulses/rot
 // mm per rot = 60 * 2 = 120 mm/rot
 
-#include "Configuration.h"
+
 
 // Constant duration of loop()
 unsigned long t = 0;
@@ -34,7 +34,6 @@ bool error_drivers = false;
 bool homing_state = false;
 bool error_printed = false;
 
-
 const float mmPerRev = 0.5 * 60 * 2; //60 teeth * 2mm teeth span
 const float stepsPerRev =  400; //microstepping
 const float HBOT_CONSTANT = mmPerRev/stepsPerRev; //mm->steps means divide, steps->mm means multiply
@@ -49,7 +48,7 @@ unsigned int Kp;
 // Default values
 const unsigned long ACCEL_PER1SEC_DEF = 30000; //acceleration per 1 second
 const int MM_SPEED_DEF = 3000; //mm per second
-const int Kp_DEF = 10; //P regulator
+const int Kp_DEF = 15; //P regulator
 
 // Boundaries
 #define MAX_ALLOWED_ACCEL 200
@@ -112,6 +111,10 @@ volatile int Tim3_count = 0;
 int Tim3_multiplier = 0;
 uint16_t Tim3_res_comp = 0;
 
+//Timer4 constants
+#define OCR4A_value 1000
+#define OCR4B_value 100
+
 
 //Position
 volatile float pos_stepper[2] = {0,0};
@@ -119,6 +122,7 @@ volatile float pos_X = 0;
 volatile float pos_Y = 0;
 
 // Speed variables
+bool preventWallHit = true;
 bool allowedSpeed[2] = {false,false};
 bool changed[2] = {false,false};
 const int initial_speed = 0; 
@@ -148,8 +152,11 @@ void evaluatePos()  {
 }
 
 /*--------------------------------------------------------------------------------------*/
+
 void setup() {
   Serial.begin(115200);
+
+  pinMode(A2, INPUT);
 
   pinMode(13, OUTPUT);
 
@@ -205,16 +212,32 @@ void setup() {
   //Enable Timer3 compare interrupt
   TIMSK3 = (1 << OCIE3A);
 
-  //TIMER 4 - send data to Raspberry, see datasheet page 168
+  //TIMER 4 - high speed 10-bit timer - send data to Raspberry, see datasheet page 168
   //Set to prescaler of 512, Timer4 has frequency 64MHz
-  //tick lasts 1/(64000000/prescaler) us = 1/(64000000/512) = 8us and thus 125x times per second
+  //tick lasts 1000/(64000000/prescaler) us = 1000/(64000000/512) = 8ms and thus 125x times per second
   TCCR4B |= (1 << CS43);
   TCCR4B &= ~(1 << CS42);
   TCCR4B |= (1 << CS41);
   TCCR4B &= ~(1 << CS40);
   TCNT4 = 0;  //set counter to 0
-  OCR4A = 1000;  // update realSpeed every 1ms
-  TIMSK4 = (1 << OCIE4A);   //allow time4 interrupt
+  OCR4B = OCR4B_value;
+  //OCR4A = OCR4A_value;  // update realSpeed every 1ms
+  TIMSK4 |= (1 << OCIE4B);   //allow timer4 interrupt
+  //TIMSK4 |= (1 << OCIE4A);   //allow timer4 interrupt
+
+  //TIMER 0 - 8 bit timer - goal check  
+  //tick lasts 256/(16000000/prescaler) us = 256/(64000000/8)
+  //CTC Mode
+  //TCCR0B &= ~(1 << WGM00);
+  //TCCR0B |= (1 << WGM01);
+  //TCCR0B &= ~(1 << WGM02);
+  //Set to prescaler of 8, Timer0 has frequency 16MHz
+  //TCCR0B |= (1 << CS02);
+  //TCCR0B &= ~(1 << CS01);
+  //TCCR0B &= ~(1 << CS00);
+  //TCNT0 = 0;  //set counter to 0
+  //OCR0A = 200;  // update realSpeed every 1ms
+  //TIMSK0 |= (1 << OCIE0A);   //allow timer0 interrupt
 
   //Enable global interrupts
   sei();
@@ -233,6 +256,7 @@ void loop() {
   //print_real_speedsXY();
   //Serial.println("TCNT3 type is " + String(TCNT1);
   checkSerialInput();
+  //checkGoal();
   evaluatePos();
   checkDriverError();
   if (!error) {

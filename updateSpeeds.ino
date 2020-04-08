@@ -83,6 +83,14 @@ void setZeroSpeeds()  {
   delay(10);
 }
 
+void waitUntilPosReached(float x, float y) {
+  setDesiredPosition(x,y);
+  while(distSqr(pos_X,pos_Y,x,y) > POSITION_ERROR_TOLERANCE) {
+    loop(); 
+  }
+  positionControl = false;
+}
+
 void setDesiredPosition(float x, float y)  {
   positionReached = false;
   positionControl=true;
@@ -224,7 +232,7 @@ void preventWallCollision() {
   //Serial.println("dist = " + String(dist)); 
   if (critical_dist > dist) {
     //Serial.println("critical_dist = " + String(critical_dist)); 
-    //Serial.println("Critical distance. Setting speed to 0.");
+    Serial.println("Critical distance. Setting speed to 0.");
     setDesiredSpeedsXY(0,0);
     positionControl = false;
   }  
@@ -237,7 +245,7 @@ void updateRealSpeeds() {
       updatePositionSpeeds();
   }
 
-  if (!homing_state)  {
+  if (!homing_state && preventWallHit)  {
     preventWallCollision();
   }
   

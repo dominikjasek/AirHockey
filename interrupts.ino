@@ -1,4 +1,8 @@
-
+void checkGoal()  {
+  if (digitalRead(A2) == LOW) {
+    Serial.println("Puck on the goal line!");
+  }
+}
 
 void errorTrigger()  {
   error = true;
@@ -144,24 +148,44 @@ ISR(TIMER3_COMPA_vect)  { //Timer for motor 0
   }
 }
 
-ISR(TIMER4_COMPA_vect)  { //Timer for sending serial data
-  static int sent_X = 0; static int sent_Y = 0;
+void sendDataToRaspberry()  { //Timer for sending serial data
+  static int sent[4] = {0,0,0,0};
   interrupts (); //alow other (motor) interrupts
   if (error && !error_printed)  {
     if (error_drivers) {
-      Serial.println("e1");      
+      Serial.println("e1");
     }
     else {
       Serial.println("e0");
     }
     error_printed = true;
   }
-  else if ((int)pos_X != sent_X || (int)pos_Y != sent_Y) {
-    sent_X = (int)pos_X; sent_Y = (int)pos_Y; 
-    Serial.println(String(sent_X) + "," + String(sent_Y) + ";" + String((int)realSpeedXY_mm[0]) + "," + String((int)realSpeedXY_mm[1]));
+  else if ((int)pos_X != sent[0] || (int)pos_Y != sent[1] || (int)realSpeedXY_mm[0] != sent[2] || (int)realSpeedXY_mm[1] != sent[3]) {
+    sent[0] = (int)pos_X; sent[1] = (int)pos_Y; sent[2] = (int)realSpeedXY_mm[0]; sent[3] = (int)realSpeedXY_mm[1];
+    Serial.println(String(sent[0]) + "," + String(sent[1]) + ";" + String(sent[2]) + "," + String(sent[3]));
     /*Serial.print(realSpeedXY_mm[0],0);
     Serial.print(",");
     Serial.println(realSpeedXY_mm[1],0);*/
   }
+  //TCNT4=0;  
+}
+
+ISR(TIMER4_COMPB_vect)  {  
+  checkGoal();
+  static int i = 0;
+  if (i++ == OCR4A_value/OCR4B_value) {
+    sendDataToRaspberry();
+    i = 0;
+  }
   TCNT4=0;  
 }
+
+
+//Timer0 interrupt - check Goal line
+/*ISR(TIMER0_COMPA_vect)  { //Timer for sending serial data
+  interrupts ();
+  if (digitalRead(A2) == LOW) {
+    Serial.println("Puck on the goal line!");
+  }
+  TCNT0 = 0;
+}*/

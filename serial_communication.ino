@@ -1,7 +1,6 @@
 // Reading variables
 char home_keyword[]  = "home";
 char demo_keyword[]  = "demo";
-char demo2_keyword[]  = "demo2";
 char test_keyword[]  = "test";
 char cyclic_test_keyword[] = "cyclic_test";
 char position_keyword[]  = "p";
@@ -11,6 +10,7 @@ char preg_keyword[]  = "kpgain";
 char default_keyword[]  = "default";
 char set_acceleration_keyword[]  = "setaccel";
 char set_maxspeed_keyword[]  = "setmaxspeed";
+char preventwallhit_keyword[]  = "preventwallhit";
 int control_mode = 3;
 char recievedChar;
 char * strtokIndx;
@@ -29,7 +29,8 @@ void checkSerialInput() {
       strtokIndx  = strtok(buf,",");  //parse buf into part ending with ","
       
       if (strcmp(strtokIndx,home_keyword) == 0) {
-        homing(homing_state,error, positionControl, switch_motor);        
+        Serial.println("going to homing");
+        homing();        
       }
       else if (strcmp(strtokIndx,position_keyword) == 0) {  // set new desired position
          //Serial.println("set new desired position");
@@ -102,6 +103,11 @@ void checkSerialInput() {
       }
       else if (strcmp(strtokIndx,default_keyword) == 0) {
         setDefaultParams();
+      }
+      else if (strcmp(strtokIndx,preventwallhit_keyword) == 0) {
+        strtokIndx = strtok(NULL, ","); //parse same strtokIndx
+        int _value = atoi(strtokIndx);  //convert string to integer
+        preventWallHit = (_value == 1)? (true) : (false);
       }
       //print_pos();
    }

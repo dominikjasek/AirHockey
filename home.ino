@@ -9,7 +9,7 @@ void loopWithoutSerial()  {
   t = micros();
 }
 
-void homing(bool& homing_state, bool& error, bool& positionControl,volatile bool& switch_motor)  {
+void homing()  {
   const float mm_speed_restore = MM_SPEED;
   const float accel_per1sec_restore = ACCEL_PER1SEC; 
   //Serial.println("mm_speed_restore = " + String(mm_speed_restore));
@@ -32,7 +32,7 @@ void homing(bool& homing_state, bool& error, bool& positionControl,volatile bool
       switch_motor = false;
       setDesiredSpeedsXY(homing_speed,0);
       error = false; 
-      for (int i =0;i<250;i++){
+      for (int i =0;i<150;i++){
         loopWithoutSerial();
       }
     }

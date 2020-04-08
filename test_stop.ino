@@ -19,11 +19,11 @@ void test_single(float accel, unsigned int max_speed, double rad, double start_Y
     //Serial.println("Starting test stop");
     
     double start_X = 70;
-    setDesiredPosition(start_X,start_Y);
-    int positionReachedCount = 0;
+    waitUntilPosReached(start_X,start_Y);
+    /*setDesiredPosition(start_X,start_Y);
     while(distSqr(pos_X,pos_Y,start_X,start_Y) > POSITION_ERROR_TOLERANCE) {
       loop(); 
-    }
+    }*/
     positionControl = false;
     setAccel(accel);
     setMaximalSpeed(max_speed); 
