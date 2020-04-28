@@ -14,13 +14,12 @@ void homing()  {
   const float accel_per1sec_restore = ACCEL_PER1SEC; 
   //Serial.println("mm_speed_restore = " + String(mm_speed_restore));
   //Serial.println("accel_restore = " + String(accel_per1sec_restore));
-  const int homing_speed = 180; //mm/s
+  const int homing_speed = 100; //mm/s
   const int accelper1sec = 1200; //mm/s^2
   setZeroSpeeds();
   delay(10);
   setMaximalSpeed(homing_speed);
   setAccel(accelper1sec);
-  //setDefaultParams();
   if (!error_drivers) {
     detachInterrupts();
     
@@ -74,9 +73,10 @@ void homing()  {
     setAccel(accel_per1sec_restore);
     resetDesiredPosition();
     attachInterrupts();
-    error = false; switch_motor = false; switch_slider = false; error_drivers = false;
+    error = false; switch_motor = false; switch_slider = false; switch_others = false; error_drivers = false;
     Serial.println("Homing finished");
     homing_state = false;
+    homed = true;
   }
   else  {
     Serial.println("There is an error in drivers. Please unplug the power from them, wait 5 seconds and try it again.");

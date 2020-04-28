@@ -18,7 +18,7 @@ unsigned long t = 0;
 #define CYCLE_DURATION 2100  //us
 
 //Barriers
-const byte OFFSET_X = 12;
+const uint8_t OFFSET_X = 12;
 const byte OFFSET_Y = 11;
 const float PUSHER_RADIUS = 47.5;
 const float BARRIER_X_MIN  = 0 + PUSHER_RADIUS + OFFSET_X;
@@ -33,6 +33,7 @@ bool error = true;
 bool error_drivers = false;
 bool homing_state = false;
 bool error_printed = false;
+bool homed = false;
 
 const float mmPerRev = 0.5 * 60 * 2; //60 teeth * 2mm teeth span
 const float stepsPerRev =  400; //microstepping
@@ -47,8 +48,8 @@ unsigned int Kp;
 
 // Default values
 const unsigned long ACCEL_PER1SEC_DEF = 30000; //acceleration per 1 second
-const int MM_SPEED_DEF = 3000; //mm per second
-const int Kp_DEF = 15; //P regulator
+const int MM_SPEED_DEF = 4000; //mm per second
+const int Kp_DEF = 13; //P regulator
 
 // Boundaries
 #define MAX_ALLOWED_ACCEL 200
@@ -58,16 +59,18 @@ const int Kp_DEF = 15; //P regulator
 
 
 //const unsigned int SPEED_IN_TOLERANCE = ACCEL+1;
-const float POSITION_ERROR_TOLERANCE = 0.4; //must be greater than 0!!!
+const float POSITION_ERROR_TOLERANCE = 1; //must be greater than 0!!!
 
 //Driver fault
-#define DRIVER_FLT_0 9  //PB5
-#define DRIVER_FLT_0_PIN PINB
-#define DRIVER_FLT_0_REGISTER_NUM 5
+//#define DRIVER_FLT_0 9  //PB5
+//#define DRIVER_FLT_0_PIN PINB
+//#define DRIVER_FLT_0_REGISTER_NUM 5
+#define DRIVER_FLT_0 A2
 
-#define DRIVER_FLT_1 10  //PB6
-#define DRIVER_FLT_1_PIN PINB
-#define DRIVER_FLT_1_REGISTER_NUM 6
+//#define DRIVER_FLT_1 10  //PB6
+//#define DRIVER_FLT_1_PIN PINB
+//#define DRIVER_FLT_1_REGISTER_NUM 6
+#define DRIVER_FLT_1 A3
 
 // End switches
 #define SWITCH_SLIDER_2 7 //PE6
@@ -83,9 +86,9 @@ const float POSITION_ERROR_TOLERANCE = 0.4; //must be greater than 0!!!
 #define SWITCH_OTHERS_REGISTER_NUM 1  
 
 // Goal laser sensors
-#define GOAL_SENSOR_ROBOT 14  //PF7, A0 Pin
-#define GOAL_SENSOR_ROBOT_PIN PINF
-#define GOAL_SENSOR_ROBOT_REGISTER_NUM 7
+//#define GOAL_SENSOR_ROBOT 14  //PF7, A0 Pin
+//#define GOAL_SENSOR_ROBOT_PIN PINF
+//#define GOAL_SENSOR_ROBOT_REGISTER_NUM 7
 
 //switch interrupts
 volatile bool switch_slider = false;
@@ -93,10 +96,20 @@ volatile bool switch_motor = false;
 volatile bool switch_others = false;
 volatile bool realSpeedsApplied = false;
 
+// Solid-state relays
+#define FANS_PIN A1
+//#define SOLENOID_PIN A5
+#define SOLENOID_PIN 9
+const unsigned int SOLENOID_MIN_DELAY = 1000; //ms
+
+// Lasers
+#define GOAL_ROBOT 8
+#define GOAL_HUMAN A3
+#define GOAL_MIN_DELAY 1000
 
 // Steppers pins
 const int PUL1 = PD6; // Pul pin of stepper 1, Digital PIN 12
-const int DIR1 = PD4; // Dir pin of stepper 1, Digital PIN 4
+const int DIR1 = PD4; // cDir pin of stepper 1, Digital PIN 4
 const int PUL2 = PC6; // Pul pin of stepper 2, Digital PIN 5
 const int DIR2 = PD7; // Dir pin of stepper 2, Digital PIN 6
 
@@ -112,8 +125,8 @@ int Tim3_multiplier = 0;
 uint16_t Tim3_res_comp = 0;
 
 //Timer4 constants
-#define OCR4A_value 1000
-#define OCR4B_value 100
+#define RASPBERRY_DATA_LAG 10
+#define OCR4B_value 10
 
 
 //Position
@@ -156,9 +169,18 @@ void evaluatePos()  {
 void setup() {
   Serial.begin(115200);
 
-  pinMode(A2, INPUT);
+  // Lasers
+  pinMode(13, OUTPUT); //diode for signalising goal
+  pinMode(GOAL_ROBOT, INPUT);
+  pinMode(GOAL_HUMAN, INPUT);
 
-  pinMode(13, OUTPUT);
+  // Relay
+  pinMode(SOLENOID_PIN,OUTPUT);
+  digitalWrite(SOLENOID_PIN, HIGH);
+  pinMode(FANS_PIN,OUTPUT);
+  digitalWrite(FANS_PIN, HIGH);
+  
+  //pinMode(13, OUTPUT);
 
   // set end switches as input
   pinMode(SWITCH_SLIDER_2, INPUT_PULLUP);
@@ -166,7 +188,7 @@ void setup() {
   pinMode(SWITCH_OTHERS, INPUT_PULLUP);
   pinMode(DRIVER_FLT_0, INPUT);
   pinMode(DRIVER_FLT_1, INPUT);
-  pinMode(GOAL_SENSOR_ROBOT,INPUT);
+  //pinMode(GOAL_SENSOR_ROBOT,INPUT);
   attachInterrupts();
   switch_slider = false; switch_others = false;
 
@@ -212,9 +234,9 @@ void setup() {
   //Enable Timer3 compare interrupt
   TIMSK3 = (1 << OCIE3A);
 
-  //TIMER 4 - high speed 10-bit timer - send data to Raspberry, see datasheet page 168
+  //TIMER 4 - high speed 10-bit timer - check goal and send data to Raspberry, see datasheet page 168
   //Set to prescaler of 512, Timer4 has frequency 64MHz
-  //tick lasts 1000/(64000000/prescaler) us = 1000/(64000000/512) = 8ms and thus 125x times per second
+  //tick lasts 100/(64000000/prescaler) us = 100/(64000000/512) = 0.8ms and thus 125x times per second, sending data is 10x longer
   TCCR4B |= (1 << CS43);
   TCCR4B &= ~(1 << CS42);
   TCCR4B |= (1 << CS41);
@@ -225,38 +247,21 @@ void setup() {
   TIMSK4 |= (1 << OCIE4B);   //allow timer4 interrupt
   //TIMSK4 |= (1 << OCIE4A);   //allow timer4 interrupt
 
-  //TIMER 0 - 8 bit timer - goal check  
-  //tick lasts 256/(16000000/prescaler) us = 256/(64000000/8)
-  //CTC Mode
-  //TCCR0B &= ~(1 << WGM00);
-  //TCCR0B |= (1 << WGM01);
-  //TCCR0B &= ~(1 << WGM02);
-  //Set to prescaler of 8, Timer0 has frequency 16MHz
-  //TCCR0B |= (1 << CS02);
-  //TCCR0B &= ~(1 << CS01);
-  //TCCR0B &= ~(1 << CS00);
-  //TCNT0 = 0;  //set counter to 0
-  //OCR0A = 200;  // update realSpeed every 1ms
-  //TIMSK0 |= (1 << OCIE0A);   //allow timer0 interrupt
-
   //Enable global interrupts
   sei();
 
   setZeroSpeeds();
-  delay(100);  
+  delay(50);  
 
   setDefaultParams();
-  delay(100);  
+  delay(50);  
   Serial.println("Setup finished");
 }
 
 /*--------------------------------------------------------------------------------------*/
 
-void loop() {  
-  //print_real_speedsXY();
-  //Serial.println("TCNT3 type is " + String(TCNT1);
+void loop() { 
   checkSerialInput();
-  //checkGoal();
   evaluatePos();
   checkDriverError();
   if (!error) {
@@ -264,7 +269,7 @@ void loop() {
   } 
   //Serial.println(micros()-t2);  
   if (micros()-t >= CYCLE_DURATION)  {
-    Serial.println("Cycle took longer time than cycle_duration: " + String(micros()-t));
+    //Serial.println("Cycle took longer time than cycle_duration: " + String(micros()-t));
   }
   while(micros()-t < CYCLE_DURATION){}  //wait for cycle to be time-equidistant 
   applyRealSpeeds();

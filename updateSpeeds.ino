@@ -61,6 +61,9 @@ void updateRealSpeedXY_mm() {
 }
 
 void setDesiredSpeedsMotors(float v0, float v1)  {
+  if (error) {
+     sendDataToRaspberry(true);
+  }
   desiredSpeed[0]= v0;
   desiredSpeed[1]= v1;
   //Serial.println("Setting motors speed to " + String(v0) + ", " + String(v1));
@@ -219,8 +222,6 @@ double minDistToWall()  {
   return distToWall;
 }
 
-
-
 double distSqr(double x1, double y1, double x2, double y2) {
   return (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2);
 }
@@ -228,10 +229,7 @@ double distSqr(double x1, double y1, double x2, double y2) {
 void preventWallCollision() {
   double critical_dist = criticalDist(realSpeed[0], realSpeed[1]);
   double dist = minDistToWall();
-  //Serial.println("critical_dist = " + String(critical_dist)); 
-  //Serial.println("dist = " + String(dist)); 
   if (critical_dist > dist) {
-    //Serial.println("critical_dist = " + String(critical_dist)); 
     Serial.println("Critical distance. Setting speed to 0.");
     setDesiredSpeedsXY(0,0);
     positionControl = false;

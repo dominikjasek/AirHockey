@@ -22,21 +22,10 @@ void pickCoefficients()  {
         p40 = 0.000000000003181;
         p31 = -0.0000000000002423;
         p22 = -0.000000000006265;
-        break;
-      /*case (30000): //stare jednotky
-        offset = 10;
-        p10 = 0.0327/0.15;
-        p20 = 0.0009032/0.15/0.15;
-        p11 = -0.002755/0.15/0.15;
-        p30 = -6.71E-07/0.15/0.15/0.15;
-        p21 = 1.18E-06/0.15/0.15/0.15;
-        p40 = 2.76E-10/0.15/0.15/0.15/0.15;
-        p31 = 1.27E-11/0.15/0.15/0.15/0.15;
-        p22 = -4.63E-10/0.15/0.15/0.15/0.15;
-        break;*/
+        break;      
       case (10000):
         Serial.println("Coefficient for a = 10000 mms^-2 were chosen.");
-        offset = 200;
+        offset = 230;
         p10 = -0.003314;
         p20 = 0.0002464;
         p11 = -0.0006785;
@@ -48,7 +37,7 @@ void pickCoefficients()  {
         break;
       case (20000):
         Serial.println("Coefficient for a = 20000 mms^-2 were chosen.");
-        offset = 150;      
+        offset = 230;      
         p10 = 0.01793;
         p20 = 0.0001257;
         p11 = -0.0003948;
@@ -83,7 +72,7 @@ void pickCoefficients()  {
         p22 = -0.00000000002341;
         break;
       case (25000):
-        Serial.println("Coefficient for a = 25000 mms^-2 were chosen.");
+        //Serial.println("Coefficient for a = 25000 mms^-2 were chosen.");
         offset = 250;      
         p10 = 0.01676;
         p20 = 0.0001033;
@@ -97,7 +86,6 @@ void pickCoefficients()  {
     }
 }
 
-// a = 50000
 double criticalDist(double realSpeed0, double realSpeed1)  {
   double x = abs(realSpeed0);
   double y = abs(realSpeed1);
@@ -105,6 +93,32 @@ double criticalDist(double realSpeed0, double realSpeed1)  {
   double x2 = x*x;
   double y2 = y*y;
   return offset + p10*(x+y)+p11*xy + p20*(x*x + y*y) + xy*p21*(x+y) + p30*(x2*x + y2*y) + p40*(x2*x2+y2*y2) + p31*xy*(x2+y2) + p22*x2*y2;
+}
+
+/*int offset;
+double p00;
+double p10;
+double p20;
+double p11;
+
+void pickCoefficients()  {
+  switch ((int)ACCEL_PER1SEC)
+    {      
+      case (25000):
+        Serial.println("Coefficient for a = 25000 mms^-2 were chosen.");
+        offset = 5;   //mm   
+        p00 = 1.584;
+        p10 = 0.001094;
+        p20 = 0.000001527;
+        p11 = -0.0000009317;
+        break;
+    }
+}
+
+double criticalDist(double realSpeed0, double realSpeed1)  {
+  double x = abs(realSpeed0);
+  double y = abs(realSpeed1);
+  return offset + p00 + p10*(x+y)+p11*x*y + p20*(x*x + y*y);
 }
 
 //// a = 10000
@@ -124,5 +138,5 @@ double criticalDist(double realSpeed0, double realSpeed1)  {
 //  double xy = x*y;
 //  double x2 = x*x;
 //  double y2 = y*y;
-//  return p0 + p10*(x+y)+p11*xy + p20*(x*x + y*y) + xy*p21*(x+y) + p30*(x2*x + y2*y) + p40*(x2*x2+y2*y2) + p31*xy*(x2+y2) + p22*x2*y2;
+//  return p0 + p10*(x+y)+p11*xy + p20*(x*x + y*y) + xy*p21*(x+y) + p30*(x2*x + y2*y) + p40*(x2*x2+y2*y2) + p31*xy*(x2+y2) + p22*x2*y2;*/
 //}

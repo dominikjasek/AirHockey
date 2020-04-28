@@ -11,6 +11,8 @@ char default_keyword[]  = "default";
 char set_acceleration_keyword[]  = "setaccel";
 char set_maxspeed_keyword[]  = "setmaxspeed";
 char preventwallhit_keyword[]  = "preventwallhit";
+char fan[] = "fans";
+char solenoid[] = "solenoid";
 int control_mode = 3;
 char recievedChar;
 char * strtokIndx;
@@ -59,7 +61,7 @@ void checkSerialInput() {
          strtokIndx = strtok(NULL, ","); //parse same strtokIndx
          float value1 = atof(strtokIndx);   
          //value1 = mmToSteps(value1);
-         Serial.println("Setting motors speeds = " + String(value0) + " " + String(value1));   
+         //Serial.println("Setting motors speeds = " + String(value0) + " " + String(value1));   
          setDesiredSpeedsMotors(value0, value1);       
       }
       else if (strcmp(strtokIndx,demo_keyword) == 0) {
@@ -109,6 +111,14 @@ void checkSerialInput() {
         int _value = atoi(strtokIndx);  //convert string to integer
         preventWallHit = (_value == 1)? (true) : (false);
       }
+      else if (strcmp(strtokIndx,solenoid) == 0) {
+        pushSolenoid();
+      }
+      else if (strcmp(strtokIndx,fan) == 0) {
+        strtokIndx = strtok(NULL, ","); //parse same strtokIndx
+        int _value = atoi(strtokIndx);  //convert string to integer
+        manipulateFan(_value);
+      }
       //print_pos();
    }
 }
@@ -133,6 +143,28 @@ int readline(int readch, char *buffer, int len) {
         }
     }
     return 0;
+}
+
+void pushSolenoid() {
+  static unsigned long timeStamp = 0;
+  if ((millis() - timeStamp) > SOLENOID_MIN_DELAY) {
+    digitalWrite(SOLENOID_PIN, LOW);
+    Serial.println("Solenoid LOW");
+    delay(50);
+    digitalWrite(SOLENOID_PIN, HIGH);
+    Serial.println("Solenoid HIGH");
+    timeStamp = millis();
+  }
+
+}
+
+void manipulateFan(int state) {
+  if (state)  {
+    digitalWrite(FANS_PIN, LOW);
+  }
+  else  {
+    digitalWrite(FANS_PIN, HIGH);
+  }
 }
 
 void setAccel(float _accel_per1sec) {
