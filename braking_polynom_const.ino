@@ -13,7 +13,7 @@ void pickCoefficients()  {
     {
       case (30000):
         //Serial.println("Coefficient for a = 30000 mms^-2 were chosen.");
-        offset = 250;  //mm
+        offset = 300;  //mm
         p10 = 0.07017;
         p20 = 0.00006;
         p11 = -0.0003183;
@@ -24,8 +24,8 @@ void pickCoefficients()  {
         p22 = -0.000000000006265;
         break;      
       case (10000):
-        Serial.println("Coefficient for a = 10000 mms^-2 were chosen.");
-        offset = 230;
+        //Serial.println("Coefficient for a = 10000 mms^-2 were chosen.");
+        offset = 260;
         p10 = -0.003314;
         p20 = 0.0002464;
         p11 = -0.0006785;
@@ -36,8 +36,8 @@ void pickCoefficients()  {
         p22 = -0.00000000004315;
         break;
       case (20000):
-        Serial.println("Coefficient for a = 20000 mms^-2 were chosen.");
-        offset = 230;      
+        //Serial.println("Coefficient for a = 20000 mms^-2 were chosen.");
+        offset = 260;      
         p10 = 0.01793;
         p20 = 0.0001257;
         p11 = -0.0003948;
@@ -73,7 +73,7 @@ void pickCoefficients()  {
         break;
       case (25000):
         //Serial.println("Coefficient for a = 25000 mms^-2 were chosen.");
-        offset = 250;      
+        offset = 260;      
         p10 = 0.01676;
         p20 = 0.0001033;
         p11 = -0.000324;

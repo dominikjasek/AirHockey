@@ -74,7 +74,7 @@ void homing()  {
     resetDesiredPosition();
     attachInterrupts();
     error = false; switch_motor = false; switch_slider = false; switch_others = false; error_drivers = false;
-    Serial.println("Homing finished");
+    //Serial.println("Homing finished");
     homing_state = false;
     homed = true;
   }

@@ -11,6 +11,7 @@ char default_keyword[]  = "default";
 char set_acceleration_keyword[]  = "setaccel";
 char set_maxspeed_keyword[]  = "setmaxspeed";
 char preventwallhit_keyword[]  = "preventwallhit";
+char led_keyword[] = "leds";
 char fan[] = "fans";
 char solenoid[] = "solenoid";
 int control_mode = 3;
@@ -31,15 +32,16 @@ void checkSerialInput() {
       strtokIndx  = strtok(buf,",");  //parse buf into part ending with ","
       
       if (strcmp(strtokIndx,home_keyword) == 0) {
-        Serial.println("going to homing");
+        //Serial.println("going to homing");
         homing();        
       }
       else if (strcmp(strtokIndx,position_keyword) == 0) {  // set new desired position
-         //Serial.println("set new desired position");
+         
          strtokIndx = strtok(NULL, ","); //parse same strtokIndx
          float value0 = atof(strtokIndx);  //convert string to integer
          strtokIndx = strtok(NULL, ","); //parse same strtokIndx
          float value1 = atof(strtokIndx);
+         //Serial.println("set new desired position: " + String(value0) + ", " + String(value1));
          setDesiredPosition(value0,value1);    
       }
       else if (strcmp(strtokIndx,velocity_keyword) == 0) {  // set XY speed
@@ -119,6 +121,14 @@ void checkSerialInput() {
         int _value = atoi(strtokIndx);  //convert string to integer
         manipulateFan(_value);
       }
+      else if (strcmp(strtokIndx,led_keyword) == 0) {
+        strtokIndx = strtok(NULL, ","); //parse same strtokIndx
+        int _value = atoi(strtokIndx);  //convert string to integer
+        led(_value);
+      }
+      else {
+        Serial.println("Bullshit: " + String(strtokIndx));
+      }
       //print_pos();
    }
 }
@@ -148,22 +158,40 @@ int readline(int readch, char *buffer, int len) {
 void pushSolenoid() {
   static unsigned long timeStamp = 0;
   if ((millis() - timeStamp) > SOLENOID_MIN_DELAY) {
+    bool turn_on_fans = false;
+    if (fan_state)  {
+      manipulateFan(0);
+      delay(5);
+      turn_on_fans = true;
+    }    
     digitalWrite(SOLENOID_PIN, LOW);
-    Serial.println("Solenoid LOW");
     delay(50);
     digitalWrite(SOLENOID_PIN, HIGH);
-    Serial.println("Solenoid HIGH");
+    if (turn_on_fans)  {
+      manipulateFan(1);
+      delay(5);
+    }
     timeStamp = millis();
   }
 
 }
 
 void manipulateFan(int state) {
+  fan_state = state;
   if (state)  {
     digitalWrite(FANS_PIN, LOW);
   }
   else  {
     digitalWrite(FANS_PIN, HIGH);
+  }
+}
+
+void led(int _value)  {
+  if (_value >= 0 && _value <= 255) {
+    analogWrite(LED_STRIP,_value);
+  }
+  else {
+    Serial.println("You set wrong led value");
   }
 }
 

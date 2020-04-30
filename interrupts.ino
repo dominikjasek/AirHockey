@@ -3,26 +3,24 @@ void checkGoal()  {
   //Serial.println("checking goal");
   if (millis()-lastGoalTimestamp > GOAL_MIN_DELAY)  {
     if (digitalRead(GOAL_ROBOT) == LOW) {
-      Serial.println("gr");
-      //tohle delalo posranej error
-      /*while (digitalRead(GOAL_ROBOT) == LOW)  {
-        Serial.println(GOAL_ROBOT);
-      };   */   
-      lastGoalTimestamp = millis();
-      //digitalWrite(13,HIGH);
-      //delay(3000);
-      //digitalWrite(13,LOW);      
+      int i = 0;
+      while (digitalRead(GOAL_ROBOT) == LOW)  {
+        if (++i == GOAL_SUM_AMOUNT)  {
+          Serial.println("gr");
+          lastGoalTimestamp = millis(); 
+          return;
+        }
+      }
     }
     if (digitalRead(GOAL_HUMAN) == LOW) {
-      Serial.println("gh");
-      //tohle delalo posranej error
-      /*while (digitalRead(GOAL_HUMAN) == LOW)  {
-        Serial.println(GOAL_HUMAN);
-      }; */      
-      lastGoalTimestamp = millis();
-      //digitalWrite(13,HIGH);
-      //delay(3000);
-      //digitalWrite(13,LOW);
+      int i = 0;
+      while (digitalRead(GOAL_HUMAN) == LOW)  {
+        if (++i == GOAL_SUM_AMOUNT)  {
+          Serial.println("gh");
+          lastGoalTimestamp = millis(); 
+          return;
+        }
+      }
     }
   }
 }
@@ -30,7 +28,9 @@ void checkGoal()  {
 void errorTrigger()  {
   error = true;
   error_printed = false;
-  homed = false;
+  if (!homing_state)  {
+    homed = false;
+  }
   //Serial.println("ERROR TRIGGER");
   //print_pos();
   setZeroSpeeds();
@@ -38,17 +38,19 @@ void errorTrigger()  {
 }
 
 void checkDriverError() {  
-  if (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1))) {
+  // check if error has occured
+  if (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1)) && !error_drivers) {
     int i = 0;
     while (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1))) {  // && !error_drivers
-      if (++i >= INDUCTION_CONSTANT_SWITCH)  {
+      if (++i >= INDUCTION_DRIVER_SWITCH)  {
         error_drivers = true;
         errorTrigger();
-        //Serial.println("Driver error...");
+        Serial.println("Driver error...");
         return;
       }
     }
   }
+  // check if error has been dismissed
   else  {
     error_drivers = false;
   }
@@ -127,9 +129,25 @@ ISR(TIMER1_COMPA_vect)  { //Timer for motor 1
     "nop" "\n\t"
     "nop" "\n\t"
     "nop" "\n\t"
-    "nop");  // Wait for step pulse
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop");   // Wait for step pulse
     //CLR(PORTC, PUL2); CLR(x,y) (x&=(~(1<<y))) 
     PORTC&=(~(1<<PUL2));
+    //Serial.println("motor 1 step");
     Tim1_count = 0;
     OCR1A = (Tim1_multiplier == 0)? (Tim1_res_comp) : (65535);
     return;
@@ -163,8 +181,19 @@ ISR(TIMER3_COMPA_vect)  { //Timer for motor 0
     "nop" "\n\t"
     "nop" "\n\t"
     "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
     "nop");  // Wait for step pulse
     //CLR(PORTD, PUL1); 
+    //Serial.println("motor 0 step");
     PORTD&=(~(1<<PUL1));
     Tim3_count = 0;
     OCR3A = (Tim3_multiplier == 0)? (Tim3_res_comp) : (65535);
@@ -181,7 +210,7 @@ ISR(TIMER3_COMPA_vect)  { //Timer for motor 0
 
 void sendDataToRaspberry(bool enforced)  { //Timer for sending serial data
   static int sent[5] = {-1,0,0,0,0};
-  interrupts (); //alow other (motor) interrupts
+  //interrupts (); //alow other (motor) interrupts
   if (error && !error_printed && !homing_state)  {
     if (error_drivers) {
       //Serial.println("e2");
@@ -191,13 +220,14 @@ void sendDataToRaspberry(bool enforced)  { //Timer for sending serial data
     }
     error_printed = true;
   }
-  else if ((int)homed != sent[0] ||(int)pos_X != sent[1] || (int)pos_Y != sent[2] || (int)realSpeedXY_mm[0] != sent[3] || (int)realSpeedXY_mm[1] != sent[4] || enforced) {
+  else if ((int)homed != sent[0] || (int)pos_X != sent[1] || (int)pos_Y != sent[2] || (int)realSpeedXY_mm[0] != sent[3] || (int)realSpeedXY_mm[1] != sent[4] || enforced) {
     sent[0] = (int)homed; sent[1] = (int)pos_X; sent[2] = (int)pos_Y; sent[3] = (int)realSpeedXY_mm[0]; sent[4] = (int)realSpeedXY_mm[1];
     Serial.println(String(sent[0]) + ";" + String(sent[1]) + "," + String(sent[2]) + ";" + String(sent[3]) + "," + String(sent[4]));
   }
 }
 
-ISR(TIMER4_COMPB_vect)  {  
+ISR(TIMER4_COMPB_vect)  { 
+  interrupts(); 
   checkGoal();
   static int i = 0;
   if (++i >= RASPBERRY_DATA_LAG) {

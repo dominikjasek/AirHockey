@@ -1,9 +1,9 @@
-template <typename T> int sgn(T val) {
+/*template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
-}
+}*/
 
 bool stepsToComp(float steps, int& Tim_multiplier, uint16_t& Tim_res_comp)  {
-  if (steps == minimal_speed) 
+  if (abs(steps) < minimal_speed) 
     return false;
   unsigned long comp = (COMP_CONSTANT)/(steps);  
   Tim_multiplier = (int) (comp / TIMER_LIMIT);
@@ -13,7 +13,6 @@ bool stepsToComp(float steps, int& Tim_multiplier, uint16_t& Tim_res_comp)  {
 
 void changeDirection(int i)  {
   noInterrupts();
-  //delay(2);
   if (i == 0) { //Motor 1
     PORTD ^= (1 << DIR1);
     TCNT3 = 0;
@@ -34,8 +33,8 @@ void resetDirections()  {
   PORTD |= (1 << DIR2);
   delayMicroseconds(5);
   direct[1] = 0;
-  lastdirect[0] = 555;
-  lastdirect[1] = 555;
+  lastdirect[0] = NOT_DEFINED;
+  lastdirect[1] = NOT_DEFINED;
 }
 
 void setDesiredSpeedsXY(float v_x, float v_y)  {  
@@ -44,12 +43,13 @@ void setDesiredSpeedsXY(float v_x, float v_y)  {
   
   //clamp by MAX_SPEED
   if(abs(v0)>MAX_MOTOR_SPEED || abs(v1) > MAX_MOTOR_SPEED)  {
-    //Serial.println("clamping by MAXSPEED");
+    //Serial.println("clamping with MAX_MOTOR_SPEED = " + String(MAX_MOTOR_SPEED));
+    //Serial.println("Before clamped: v0 = " + String(v0) + ", v = " + String(v1));
     float bigger = (abs(v0) > abs(v1)) ? (abs(v0)) : (abs(v1));
     v0 = mapf(v0,-bigger,bigger, -MAX_MOTOR_SPEED, MAX_MOTOR_SPEED);
     v1 = mapf(v1,-bigger,bigger, -MAX_MOTOR_SPEED, MAX_MOTOR_SPEED);
-  }  
-  
+    //Serial.println("Clamped: v0 = " + String(v0) + ", v = " + String(v1));
+  }    
   setDesiredSpeedsMotors(v0,v1);
 }
 
@@ -66,7 +66,7 @@ void setDesiredSpeedsMotors(float v0, float v1)  {
   }
   desiredSpeed[0]= v0;
   desiredSpeed[1]= v1;
-  //Serial.println("Setting motors speed to " + String(v0) + ", " + String(v1));
+  //Serial.println("Setting desired motors speed to " + String(desiredSpeed[0]) + ", " + String(desiredSpeed[1]));
 }
 
 void setZeroSpeeds()  {
@@ -95,10 +95,16 @@ void waitUntilPosReached(float x, float y) {
 }
 
 void setDesiredPosition(float x, float y)  {
-  positionReached = false;
-  positionControl=true;
-  desiredPosition[0] = x;
-  desiredPosition[1] = y;
+  if (x < BARRIER_X_MAX && x > BARRIER_X_MIN + 10 && y < BARRIER_Y_MAX && y > BARRIER_Y_MIN) {
+    positionReached = false;
+    positionControl=true;
+    desiredPosition[0] = x;
+    desiredPosition[1] = y;
+    //Serial.println("Desired position is set to [" + String(desiredPosition[0]) + "," + String(desiredPosition[1]) + "]");
+  }
+  else  {
+    Serial.println("Desired position out of field: x = " + String(x) + ", y = " + String(y));
+  }
 }
 
 void resetDesiredPosition() {
@@ -131,15 +137,18 @@ bool oppositeSigns(float x, float y) {
 void updatePositionSpeeds() {
   float diff_x = desiredPosition[0] - pos_X;
   float diff_y = desiredPosition[1] - pos_Y;
+  //Serial.println("[diff_x, diff_Y] = [" + String(diff_x) + "," + String(diff_y) + "]");
   float error = diff_x*diff_x + diff_y*diff_y;
   if (error < POSITION_ERROR_TOLERANCE)  {
     //Serial.println("We reached the target");
     setDesiredSpeedsXY(0,0);
-    //positionReached = true;
+    positionReached = true;
   }
   else  {
-    //Serial.println("We havent reached the target yet");
-    setDesiredSpeedsXY(Kp*diff_x,Kp*diff_y);
+    float v_x = Kp*diff_x;
+    float v_y = Kp*diff_y;
+    //Serial.println("Setting speed to v_x = " + String(v_x) + ", v_y = " + String(v_y));
+    setDesiredSpeedsXY(v_x,v_y);
   }
 }
 
@@ -239,7 +248,7 @@ void preventWallCollision() {
 /*===========================================================================================*/
 void updateRealSpeeds() {   
   
-  if (positionControl) { // && !positionReached) { //positionControl 
+  if (positionControl && !positionReached) { //positionControl 
       updatePositionSpeeds();
   }
 
@@ -264,6 +273,10 @@ void updateRealSpeeds() {
       
       if (abs(realSpeed[i] - desiredSpeed[i]) < accel[i]+1) {   // we are roughly on desired speed -> set directly desired speed
         realSpeed[i] = desiredSpeed[i];
+        if (realSpeed[i] == MAX_MOTOR_SPEED) {
+          //Serial.println("Motor " + String(i) + " is on max speed.");
+          //print_real_speeds();
+        }
         //Serial.println("we are there, realspeed = " + String(realSpeed[1]) + " ,desired speed = " +String(desiredSpeed[1]));
         //Serial.println(realSpeed[1] - desiredSpeed[1]);
       }
@@ -287,10 +300,11 @@ void updateRealSpeeds() {
 
 void applyRealSpeeds() {
   updateRealSpeedXY_mm();
-  if (realSpeed[0] != speedToCompare[0]) {
+  if (abs(realSpeed[0] - speedToCompare[0]) > 1) {
+    //Serial.println("Applying change on speed of motor 0...");
     applyRealSpeed0(); 
   }
-  if (realSpeed[1] != speedToCompare[1]) {
+  if (abs(realSpeed[1] - speedToCompare[1]) > 1) {
     applyRealSpeed1(); 
   }
 }
@@ -298,8 +312,8 @@ void applyRealSpeeds() {
 void applyRealSpeed0(){
   //if (realSpeed[0] != speedToCompare[0]) {
       bool moving = stepsToComp(abs(realSpeed[0]), Tim3_multiplier, Tim3_res_comp);
-      //Serial.print("compare value: ");
-      //Serial.println(comp);
+      //Serial.print("setting compare value motor 0: ");
+      //Serial.println(Tim3_res_comp);
       if (!moving) {  //not moving
         if (direct[0] != 0) {
           lastdirect[0] = direct[0];
@@ -321,7 +335,7 @@ void applyRealSpeed0(){
             changeDirection(0);            
       }
       else if (speedToCompare[0] == 0)  {
-        if (realSpeed[0]<0 && lastdirect[0] == 555) { //if first move is negative than changedirection
+        if (realSpeed[0]<0 && lastdirect[0] == NOT_DEFINED) { //if first move is negative than changedirection
           changeDirection(0);
           TCNT3 = 0;
         }
@@ -340,10 +354,11 @@ void applyRealSpeed0(){
 void applyRealSpeed1(){
   //if (realSpeed[1] != speedToCompare[1]) {
       bool moving = stepsToComp(abs(realSpeed[1]), Tim1_multiplier, Tim1_res_comp);
-      //Serial.println("compare value: ");
-      //Serial.println(comp);
+      //Serial.println("setting compare value motor 1: ");
+      //Serial.println(Tim1_res_comp);
       if (!moving) {  //not moving
         if (direct[1] != 0) {
+          //Serial.println("stepper 1 is not moving");
           lastdirect[1] = direct[1];
           direct[1] = 0;
         }
@@ -364,7 +379,7 @@ void applyRealSpeed1(){
             changeDirection(1);            
       }
       else if (speedToCompare[1] == 0)  {
-        if (realSpeed[1]<0 && lastdirect[1] == 555) { //if first move is negative than changedirection
+        if (realSpeed[1]<0 && lastdirect[1] == NOT_DEFINED) { //if first move is negative than changedirection
           changeDirection(1);
           TCNT1 = 0;
         }

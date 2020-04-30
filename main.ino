@@ -8,147 +8,7 @@
   Pinmapping of CPU: https://www.arduino.cc/en/Hacking/PinMapping32u4
 */
 
-// pulses needed for 1 rotation = 400 pulses/rot
-// mm per rot = 60 * 2 = 120 mm/rot
-
-
-
-// Constant duration of loop()
-unsigned long t = 0;
-#define CYCLE_DURATION 2100  //us
-
-//Barriers
-const uint8_t OFFSET_X = 12;
-const byte OFFSET_Y = 11;
-const float PUSHER_RADIUS = 47.5;
-const float BARRIER_X_MIN  = 0 + PUSHER_RADIUS + OFFSET_X;
-const float BARRIER_X_MAX = 447;
-const float BARRIER_Y_MIN  = -300 + PUSHER_RADIUS + OFFSET_Y;
-const float BARRIER_Y_MAX = 300 - PUSHER_RADIUS - OFFSET_Y;
-const float START_Y = BARRIER_Y_MAX;
-const float START_X = BARRIER_X_MIN;
-const int INDUCTION_CONSTANT_SWITCH = 2; //due to current in motors, there is inductive current in microswitch and thus we are searching for 2 consecutive events when switch stays constant and doesnt jump
-
-bool error = true;
-bool error_drivers = false;
-bool homing_state = false;
-bool error_printed = false;
-bool homed = false;
-
-const float mmPerRev = 0.5 * 60 * 2; //60 teeth * 2mm teeth span
-const float stepsPerRev =  400; //microstepping
-const float HBOT_CONSTANT = mmPerRev/stepsPerRev; //mm->steps means divide, steps->mm means multiply
-
-// Speed variables
-float ACCEL_PER1SEC;  //accel for axis per 1 second
-float ACCEL;  //accel for motor in steps per cycle
-float MM_SPEED;
-float MAX_MOTOR_SPEED;
-unsigned int Kp;
-
-// Default values
-const unsigned long ACCEL_PER1SEC_DEF = 30000; //acceleration per 1 second
-const int MM_SPEED_DEF = 4000; //mm per second
-const int Kp_DEF = 13; //P regulator
-
-// Boundaries
-#define MAX_ALLOWED_ACCEL 200
-#define MAX_ALLOWED_ACCEL_PER1SEC 200000
-#define MAX_MOTOR_ALLOWED_SPEED 20000
-#define MAX_KPGAIN 1000
-
-
-//const unsigned int SPEED_IN_TOLERANCE = ACCEL+1;
-const float POSITION_ERROR_TOLERANCE = 1; //must be greater than 0!!!
-
-//Driver fault
-//#define DRIVER_FLT_0 9  //PB5
-//#define DRIVER_FLT_0_PIN PINB
-//#define DRIVER_FLT_0_REGISTER_NUM 5
-#define DRIVER_FLT_0 A2
-
-//#define DRIVER_FLT_1 10  //PB6
-//#define DRIVER_FLT_1_PIN PINB
-//#define DRIVER_FLT_1_REGISTER_NUM 6
-#define DRIVER_FLT_1 A3
-
-// End switches
-#define SWITCH_SLIDER_2 7 //PE6
-#define SWITCH_SLIDER_2_PIN PINE
-#define SWITCH_SLIDER_2_REGISTER_NUM 6
-
-#define SWITCH_MOTOR 3 //PD0
-#define SWITCH_MOTOR_PIN PIND
-#define SWITCH_MOTOR_REGISTER_NUM 0
-
-#define SWITCH_OTHERS 2  //PD1
-#define SWITCH_OTHERS_PIN PIND
-#define SWITCH_OTHERS_REGISTER_NUM 1  
-
-// Goal laser sensors
-//#define GOAL_SENSOR_ROBOT 14  //PF7, A0 Pin
-//#define GOAL_SENSOR_ROBOT_PIN PINF
-//#define GOAL_SENSOR_ROBOT_REGISTER_NUM 7
-
-//switch interrupts
-volatile bool switch_slider = false;
-volatile bool switch_motor = false;
-volatile bool switch_others = false;
-volatile bool realSpeedsApplied = false;
-
-// Solid-state relays
-#define FANS_PIN A1
-//#define SOLENOID_PIN A5
-#define SOLENOID_PIN 9
-const unsigned int SOLENOID_MIN_DELAY = 1000; //ms
-
-// Lasers
-#define GOAL_ROBOT 8
-#define GOAL_HUMAN A3
-#define GOAL_MIN_DELAY 1000
-
-// Steppers pins
-const int PUL1 = PD6; // Pul pin of stepper 1, Digital PIN 12
-const int DIR1 = PD4; // cDir pin of stepper 1, Digital PIN 4
-const int PUL2 = PC6; // Pul pin of stepper 2, Digital PIN 5
-const int DIR2 = PD7; // Dir pin of stepper 2, Digital PIN 6
-
-// Timer Interrupt Compare variables
-#define TIMER_LIMIT 65535
-const int prescaler = 8; // if you change this value, you need to change TCCR1B and TCCR3B too!!!
-const long COMP_CONSTANT = 16000000/prescaler;
-volatile int Tim1_count = 0;  //counter to go above highest value to compare
-int Tim1_multiplier = 0;  //used to compare Tim1_count if minimal speed is too low for one comp cycle
-uint16_t Tim1_res_comp = 0;
-volatile int Tim3_count = 0;
-int Tim3_multiplier = 0;
-uint16_t Tim3_res_comp = 0;
-
-//Timer4 constants
-#define RASPBERRY_DATA_LAG 10
-#define OCR4B_value 10
-
-
-//Position
-volatile float pos_stepper[2] = {0,0};
-volatile float pos_X = 0;
-volatile float pos_Y = 0;
-
-// Speed variables
-bool preventWallHit = true;
-bool allowedSpeed[2] = {false,false};
-bool changed[2] = {false,false};
-const int initial_speed = 0; 
-const int minimal_speed = 0; //minimal speed: 31 steps/sec for 8 prescaler
-bool positionControl = false;
-bool positionReached = false;
-float desiredPosition[2] = {START_X,START_Y};
-float desiredSpeed[2] = {0,0};
-float realSpeedXY_mm[2] = {0,0};
-float speedToCompare[2] = {0,0};
-float realSpeed[2] = {0,0};
-int direct[2] = {0, 0}; //1 = CCW, -1 = CW
-int lastdirect[2] = {555, 555};
+#include "constants.h"
 
 /*--------------------------------------------------------------------------------------*/
 float mmToSteps(float mm) {
@@ -170,7 +30,7 @@ void setup() {
   Serial.begin(115200);
 
   // Lasers
-  pinMode(13, OUTPUT); //diode for signalising goal
+  //pinMode(13, OUTPUT); //diode for signalising goal
   pinMode(GOAL_ROBOT, INPUT);
   pinMode(GOAL_HUMAN, INPUT);
 
@@ -180,7 +40,9 @@ void setup() {
   pinMode(FANS_PIN,OUTPUT);
   digitalWrite(FANS_PIN, HIGH);
   
-  //pinMode(13, OUTPUT);
+  // Led strip
+  pinMode(LED_STRIP, OUTPUT);
+  digitalWrite(LED_STRIP, LOW);
 
   // set end switches as input
   pinMode(SWITCH_SLIDER_2, INPUT_PULLUP);
@@ -254,13 +116,14 @@ void setup() {
   delay(50);  
 
   setDefaultParams();
-  delay(50);  
-  Serial.println("Setup finished");
+  delay(2000); 
+  Serial.println("restarted");
 }
 
 /*--------------------------------------------------------------------------------------*/
 
-void loop() { 
+void loop() {
+  //Serial.println("FLT_0 = " + String(digitalRead(DRIVER_FLT_0)) + " FLT_1 = " + String(digitalRead(DRIVER_FLT_1)));
   checkSerialInput();
   evaluatePos();
   checkDriverError();
@@ -269,9 +132,11 @@ void loop() {
   } 
   //Serial.println(micros()-t2);  
   if (micros()-t >= CYCLE_DURATION)  {
-    //Serial.println("Cycle took longer time than cycle_duration: " + String(micros()-t));
+    Serial.println("Cycle took longer time than cycle_duration: " + String(micros()-t));
   }
-  while(micros()-t < CYCLE_DURATION){}  //wait for cycle to be time-equidistant 
+  else {
+    while(micros()-t < CYCLE_DURATION){}  //wait for cycle to be time-equidistant 
+  }
   applyRealSpeeds();
   t = micros();
 }
