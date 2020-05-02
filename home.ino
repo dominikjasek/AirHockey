@@ -14,7 +14,7 @@ void homing()  {
   const float accel_per1sec_restore = ACCEL_PER1SEC; 
   //Serial.println("mm_speed_restore = " + String(mm_speed_restore));
   //Serial.println("accel_restore = " + String(accel_per1sec_restore));
-  const int homing_speed = 150; //mm/s
+  const int homing_speed = 170; //mm/s
   const int accelper1sec = 1200; //mm/s^2
   setZeroSpeeds();
   delay(10);

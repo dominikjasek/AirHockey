@@ -1,6 +1,6 @@
-/*template <typename T> int sgn(T val) {
+template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
-}*/
+}
 
 bool stepsToComp(float steps, int& Tim_multiplier, uint16_t& Tim_res_comp)  {
   if (abs(steps) < minimal_speed) 
@@ -140,6 +140,7 @@ void updatePositionSpeeds() {
 
 void setDefaultParams() {
   setAccel(ACCEL_PER1SEC_DEF);
+  setDecel(DECEL_GAIN_DEF);
   setMaximalSpeed(MM_SPEED_DEF);
   setKpGain(Kp_DEF);
 }
@@ -242,40 +243,45 @@ void updateRealSpeeds() {
     preventWallCollision();
   }
   
-  float accel[2] = {(float)ACCEL,(float)ACCEL};
+  //float accel[2];
   float speed_diff[2];
-  speed_diff[0] = abs(realSpeed[0] - desiredSpeed[0]);
-  speed_diff[1] = abs(realSpeed[1] - desiredSpeed[1]);  
+  speed_diff[0] = desiredSpeed[0] - realSpeed[0];
+  speed_diff[1] = desiredSpeed[1] - realSpeed[1];  
   speedToCompare[0] = realSpeed[0];
   speedToCompare[1] = realSpeed[1];
-  //Serial.println("speed_diff = " + String(speed_diff[0]) + ", " + String(speed_diff[1]));
 
-  if ((speed_diff[0] > 0.1) || (speed_diff[1] > 0.1)) {
-    float highest_speed = (speed_diff[0] > speed_diff[1]) ? (speed_diff[0]) : (speed_diff[1]);
-    for (int i = 0; i < 2; i++) {
-      accel[i] = mapf(speed_diff[i],0 ,highest_speed, 0, ACCEL);
-      //Serial.println("accel[" + String(i) + "] = " + String(accel[i]));
+  float higher_diff = (abs(speed_diff[0]) > abs(speed_diff[1])) ? (abs(speed_diff[0])) : (abs(speed_diff[1]));
+
+  //pick acceleration in depending on acceleration/deceleration
+  float ACCEL_PICKED;
+  if (!oppositeSigns(desiredSpeed[0], realSpeed[0]) && !oppositeSigns(desiredSpeed[1], realSpeed[1]) && abs(desiredSpeed[0]) >= abs(realSpeed[0]) && abs(desiredSpeed[1]) >= abs(realSpeed[1])) {
+    ACCEL_PICKED = ACCEL;
+  }
+  else { 
+    ACCEL_PICKED = DECEL;
+  }
+  
+  for (int i = 0; i < 2; i++) {
+    if (abs(speed_diff[i]) > SPEED_TO_UPDATE) {
+      const int speed_diff_sgn = sgn(speed_diff[i]);
       
-      if (abs(realSpeed[i] - desiredSpeed[i]) < accel[i]+1) {   // we are roughly on desired speed -> set directly desired speed
+      //if both motors are accelerating:
+      float accel = mapf(speed_diff[i],0 ,speed_diff_sgn*higher_diff, 0, speed_diff_sgn*ACCEL_PICKED);
+
+      // if atleast one of motors is decelerating, use decelration value for it
+      
+      //Serial.println("accel " + String(i) + " = " + String(accel));
+      
+      if (abs(speed_diff[i]) < abs(accel + SPEED_TO_UPDATE)) {   // we are roughly on desired speed -> set directly desired speed
         realSpeed[i] = desiredSpeed[i];
       }
       
       else  {
-        if (oppositeSignsAdvanced(realSpeed[i], desiredSpeed[i]))  {      //desired speed is opposite or zero -> go to zero
-          realSpeed[i] += (realSpeed[i] > 0)? (-accel[i]) : (accel[i]);
-        }
-        
-        else  {
-          if (abs(realSpeed[i]) < abs(desiredSpeed[i])) { //go faster
-            realSpeed[i] += (desiredSpeed[i] > 0)? (accel[i]) : (-accel[i]);
-          }
-          else  {                             //go slower
-            realSpeed[i] += (desiredSpeed[i] > 0)? (-accel[i]) : (+accel[i]);
-          }
-        }  
+        realSpeed[i] += accel; 
       }
     }
   }
+  //print_real_speeds();
 }
 
 void applyRealSpeeds() {

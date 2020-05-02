@@ -30,15 +30,18 @@ const float HBOT_CONSTANT = mmPerRev/stepsPerRev; //mm->steps means divide, step
 
 // Speed variables
 float ACCEL_PER1SEC;  //accel for axis per 1 second
+unsigned int DECEL_GAIN;
+float DECEL;
 float ACCEL;  //accel for motor in steps per cycle
 float MM_SPEED;
 float MAX_MOTOR_SPEED;
 unsigned int Kp;
 
 // Default values
-const unsigned long ACCEL_PER1SEC_DEF = 15000; //acceleration per 1 second
-const int MM_SPEED_DEF = 500; //mm per second
-const int Kp_DEF = 6; //P regulator
+const unsigned long ACCEL_PER1SEC_DEF = 20000; //acceleration per 1 second
+const int MM_SPEED_DEF = 2000; //mm per second
+const int Kp_DEF = 20; //P regulator
+const int DECEL_GAIN_DEF = 5;
 
 // Boundaries
 #define MAX_ALLOWED_ACCEL 200
@@ -47,7 +50,7 @@ const int Kp_DEF = 6; //P regulator
 #define MAX_KPGAIN 1000
 
 
-//const unsigned int SPEED_IN_TOLERANCE = ACCEL+1;
+const unsigned int SPEED_TO_UPDATE = 0.3; //speed lower than this difference is ignored and not updated
 const float POSITION_ERROR_TOLERANCE = 1.5; //must be greater than 0!!!
 
 //Driver fault
@@ -117,7 +120,7 @@ volatile float pos_X = 0;
 volatile float pos_Y = 0;
 
 // Speed variables
-bool preventWallHit = true;
+bool preventWallHit = false;
 bool allowedSpeed[2] = {false,false};
 bool changed[2] = {false,false};
 const int initial_speed = 0; 

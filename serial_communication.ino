@@ -9,6 +9,7 @@ char motors_keyword[]  = "m";
 char preg_keyword[]  = "kpgain";
 char default_keyword[]  = "default";
 char set_acceleration_keyword[]  = "setaccel";
+char set_decelgain_keyword[]  = "setdecelgain";
 char set_maxspeed_keyword[]  = "setmaxspeed";
 char preventwallhit_keyword[]  = "preventwallhit";
 char led_keyword[] = "leds";
@@ -73,6 +74,11 @@ void checkSerialInput() {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
         float acc = atof(strtokIndx);  //convert string to integer
         setAccel(acc);  
+      }
+      else if (strcmp(strtokIndx,set_decelgain_keyword) == 0) {
+        strtokIndx = strtok(NULL, ","); //parse same strtokIndx
+        const int d = atoi(strtokIndx);  //convert string to integer
+        setDecel(d);  
       }
       else if (strcmp(strtokIndx,set_maxspeed_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
@@ -207,6 +213,12 @@ void setAccel(float _accel_per1sec) {
   }
   else 
     Serial.println("Acceleration must be greater than 0 and lower than " + String(MAX_ALLOWED_ACCEL_PER1SEC));
+}
+
+void setDecel(int _DECEL_GAIN) {
+  DECEL_GAIN = _DECEL_GAIN;
+  DECEL = DECEL_GAIN * ACCEL;
+  Serial.println("DECEL set to " + String(DECEL));
 }
 
 void setMaximalSpeed(float _maxspeed) {
