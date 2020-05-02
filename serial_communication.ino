@@ -72,7 +72,6 @@ void checkSerialInput() {
       else if (strcmp(strtokIndx,set_acceleration_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
         float acc = atof(strtokIndx);  //convert string to integer
-        Serial.println("acc red =" + String(acc)); 
         setAccel(acc);  
       }
       else if (strcmp(strtokIndx,set_maxspeed_keyword) == 0) {

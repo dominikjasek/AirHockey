@@ -30,7 +30,6 @@ void setup() {
   Serial.begin(115200);
 
   // Lasers
-  //pinMode(13, OUTPUT); //diode for signalising goal
   pinMode(GOAL_ROBOT, INPUT);
   pinMode(GOAL_HUMAN, INPUT);
 
@@ -61,7 +60,7 @@ void setup() {
   DDRC |= (1 << PUL2);
   DDRD |= (1 << DIR2);
 
-  //resetDirections();
+  resetDirections(); resetDirections();
 
   //Reset Timer1 Control Reg A
   TCCR1A = 0;
@@ -98,7 +97,7 @@ void setup() {
 
   //TIMER 4 - high speed 10-bit timer - check goal and send data to Raspberry, see datasheet page 168
   //Set to prescaler of 512, Timer4 has frequency 64MHz
-  //tick lasts 100/(64000000/prescaler) us = 100/(64000000/512) = 0.8ms and thus 125x times per second, sending data is 10x longer
+  //1 increment lasts = prescaler/64000000 us, one cycle lasts OCR4B_value*increment = 0.0008ms and thus 1250x times per second, sending data is RASPBERRY_DATA_LAG times less frequent
   TCCR4B |= (1 << CS43);
   TCCR4B &= ~(1 << CS42);
   TCCR4B |= (1 << CS41);

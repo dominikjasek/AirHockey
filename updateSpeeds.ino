@@ -11,30 +11,18 @@ bool stepsToComp(float steps, int& Tim_multiplier, uint16_t& Tim_res_comp)  {
   return true;
 }
 
-void changeDirection(int i)  {
-  noInterrupts();
-  if (i == 0) { //Motor 1
-    PORTD ^= (1 << DIR1);
-    TCNT3 = 0;
-    delayMicroseconds(5);    
-  }
-  else  { //Motor 2
-    PORTD ^= (1 << DIR2);
-    TCNT1 = 0;
-    delayMicroseconds(5); 
-  }
-  interrupts();
-}
+
 
 void resetDirections()  {
+  //const int PIN_DIR = (motor_index == 0)? (DIR1) : (DIR2);
   PORTD |= (1 << DIR1);
   delayMicroseconds(5);
   direct[0] = 0;
   PORTD |= (1 << DIR2);
   delayMicroseconds(5);
   direct[1] = 0;
-  lastdirect[0] = NOT_DEFINED;
-  lastdirect[1] = NOT_DEFINED;
+  dir_state[0] = 1;
+  dir_state[1] = 1;
 }
 
 void setDesiredSpeedsXY(float v_x, float v_y)  {  
@@ -77,8 +65,6 @@ void setZeroSpeeds()  {
   allowedSpeed[1] = false;
   changed[0] = false;
   changed[1] = false;
-  //absrealSpeed[0] = 0;
-  //absrealSpeed[1] = 0;
   resetDirections();
   
   OCR1A = TIMER_LIMIT;
@@ -95,7 +81,7 @@ void waitUntilPosReached(float x, float y) {
 }
 
 void setDesiredPosition(float x, float y)  {
-  if (x < BARRIER_X_MAX && x > BARRIER_X_MIN + 10 && y < BARRIER_Y_MAX && y > BARRIER_Y_MIN) {
+  if (x < BARRIER_X_MAX -3 && x > BARRIER_X_MIN && y < BARRIER_Y_MAX && y > BARRIER_Y_MIN) {
     positionReached = false;
     positionControl=true;
     desiredPosition[0] = x;
@@ -103,7 +89,7 @@ void setDesiredPosition(float x, float y)  {
     //Serial.println("Desired position is set to [" + String(desiredPosition[0]) + "," + String(desiredPosition[1]) + "]");
   }
   else  {
-    Serial.println("Desired position out of field: x = " + String(x) + ", y = " + String(y));
+    Serial.println("out of field: x = " + String(x) + ", y = " + String(y));
   }
 }
 
@@ -264,22 +250,16 @@ void updateRealSpeeds() {
   speedToCompare[1] = realSpeed[1];
   //Serial.println("speed_diff = " + String(speed_diff[0]) + ", " + String(speed_diff[1]));
 
-  if (!(speed_diff[0] < 1 && speed_diff[1] < 1)) {
+  if ((speed_diff[0] > 0.1) || (speed_diff[1] > 0.1)) {
     float highest_speed = (speed_diff[0] > speed_diff[1]) ? (speed_diff[0]) : (speed_diff[1]);
-    //Serial.println("--------");  
     for (int i = 0; i < 2; i++) {
       accel[i] = mapf(speed_diff[i],0 ,highest_speed, 0, ACCEL);
       //Serial.println("accel[" + String(i) + "] = " + String(accel[i]));
       
       if (abs(realSpeed[i] - desiredSpeed[i]) < accel[i]+1) {   // we are roughly on desired speed -> set directly desired speed
         realSpeed[i] = desiredSpeed[i];
-        if (realSpeed[i] == MAX_MOTOR_SPEED) {
-          //Serial.println("Motor " + String(i) + " is on max speed.");
-          //print_real_speeds();
-        }
-        //Serial.println("we are there, realspeed = " + String(realSpeed[1]) + " ,desired speed = " +String(desiredSpeed[1]));
-        //Serial.println(realSpeed[1] - desiredSpeed[1]);
       }
+      
       else  {
         if (oppositeSignsAdvanced(realSpeed[i], desiredSpeed[i]))  {      //desired speed is opposite or zero -> go to zero
           realSpeed[i] += (realSpeed[i] > 0)? (-accel[i]) : (accel[i]);
@@ -300,98 +280,72 @@ void updateRealSpeeds() {
 
 void applyRealSpeeds() {
   updateRealSpeedXY_mm();
-  if (abs(realSpeed[0] - speedToCompare[0]) > 1) {
-    //Serial.println("Applying change on speed of motor 0...");
+  if (realSpeed[0] != speedToCompare[0]) {
     applyRealSpeed0(); 
   }
-  if (abs(realSpeed[1] - speedToCompare[1]) > 1) {
+  if (realSpeed[1] != speedToCompare[1]) {
     applyRealSpeed1(); 
   }
 }
 
 void applyRealSpeed0(){
-  //if (realSpeed[0] != speedToCompare[0]) {
-      bool moving = stepsToComp(abs(realSpeed[0]), Tim3_multiplier, Tim3_res_comp);
-      //Serial.print("setting compare value motor 0: ");
-      //Serial.println(Tim3_res_comp);
-      if (!moving) {  //not moving
-        if (direct[0] != 0) {
-          lastdirect[0] = direct[0];
-          direct[0] = 0;
-        }
+    bool moving = stepsToComp(abs(realSpeed[0]), Tim3_multiplier, Tim3_res_comp);
+    //Serial.print("setting compare value motor 0: ");
+    //Serial.println(Tim3_res_comp);
+    if (!moving) {  //not moving
+      if (direct[0] != 0) {
+        dir_state[0] = direct[0]; //save direction state
+        direct[0] = 0;
       }
-      else  { 
-        direct[0] = (realSpeed[0] > 0)? (1) : (-1);
-      }
-  
-      OCR3A = (Tim3_multiplier == 0)? (Tim3_res_comp) : (TIMER_LIMIT);
-      // Check  if we need to reset the timer...
-      if (TCNT3 > OCR3A)
-        TCNT3 = OCR3A-1;
+    }
+    else  {
+      direct[0] = (realSpeed[0] > 0)? (1) : (-1);
 
-      if (oppositeSigns(realSpeed[0], speedToCompare[0]))  {  //if we are crossing zero speed
-            //Serial.println("changing direction while accelerating");
-            //Serial.println("case 1");
-            changeDirection(0);            
-      }
-      else if (speedToCompare[0] == 0)  {
-        if (realSpeed[0]<0 && lastdirect[0] == NOT_DEFINED) { //if first move is negative than changedirection
-          changeDirection(0);
-          TCNT3 = 0;
-        }
-        else if (realSpeed[0]>0 && lastdirect[0] == -1) {
-          //Serial.println("case 2");
-          changeDirection(0);
-        }
-        else if (realSpeed[0] < 0 && lastdirect[0] == 1)  {
-          //Serial.println("case 3");
-          changeDirection(0);
+      // starting from zero speed
+      if (abs(speedToCompare[0]) < minimal_speed) {
+        if (oppositeSigns(direct[0], dir_state[0])) {
+          changeDirection0();
         }
       }
-    //}
+
+      else if (oppositeSigns(realSpeed[0], speedToCompare[0]))  {  //if we are crossing zero speed
+          changeDirection0();            
+      }
+    } 
+    OCR3A = (Tim3_multiplier == 0)? (Tim3_res_comp) : (TIMER_LIMIT);
+    // Check  if we need to reset the timer...
+    if (TCNT3 > OCR3A)
+      TCNT3 = OCR3A-1;
 }
 
 void applyRealSpeed1(){
-  //if (realSpeed[1] != speedToCompare[1]) {
-      bool moving = stepsToComp(abs(realSpeed[1]), Tim1_multiplier, Tim1_res_comp);
-      //Serial.println("setting compare value motor 1: ");
-      //Serial.println(Tim1_res_comp);
-      if (!moving) {  //not moving
-        if (direct[1] != 0) {
-          //Serial.println("stepper 1 is not moving");
-          lastdirect[1] = direct[1];
-          direct[1] = 0;
-        }
+    bool moving = stepsToComp(abs(realSpeed[1]), Tim1_multiplier, Tim1_res_comp);
+    //Serial.println("setting compare value motor 1: ");
+    //Serial.println(Tim1_res_comp);
+    if (!moving) {  //not moving
+      if (direct[1] != 0) {
+        dir_state[1] = direct[1]; //save direction state
+        direct[1] = 0;
       }
-      else  { 
-        direct[1] = (realSpeed[1] > 0)? (1) : (-1);
+    }
+    else  { 
+      direct[1] = (realSpeed[1] > 0)? (1) : (-1);
+
+      // starting from zero speed
+      if (abs(speedToCompare[1]) < minimal_speed) {
+        if (oppositeSigns(direct[1], dir_state[1])) {
+          changeDirection1();
+        }
       }
 
-      OCR1A = (Tim1_multiplier == 0)? (Tim1_res_comp) : (TIMER_LIMIT);
-      // Check  if we need to reset the timer...
-      if (TCNT1 > OCR1A)
-        TCNT1 = OCR1A-1;
+      else if (oppositeSigns(realSpeed[1], speedToCompare[1]))  {  //if we are crossing zero speed
+          changeDirection1();            
+      }
+    } 
 
-      
-      if (oppositeSigns(realSpeed[1], speedToCompare[1]))  {  //if we are crossing zero speed
-            //Serial.println("changing direction while accelerating");
-            //Serial.println("case 1");
-            changeDirection(1);            
-      }
-      else if (speedToCompare[1] == 0)  {
-        if (realSpeed[1]<0 && lastdirect[1] == NOT_DEFINED) { //if first move is negative than changedirection
-          changeDirection(1);
-          TCNT1 = 0;
-        }
-        
-        else if (realSpeed[1]>0 && lastdirect[1] == -1) {
-          //Serial.println("case 2");
-          changeDirection(1);
-        }
-        else if (realSpeed[1] < 0 && lastdirect[1] == 1)  {
-          //Serial.println("case 3");
-          changeDirection(1);
-        }
-      }
-    //}
+    //Change compare value
+    OCR1A = (Tim1_multiplier == 0)? (Tim1_res_comp) : (TIMER_LIMIT);
+    // Check if we exceeded Compare value
+    if (TCNT1 > OCR1A)
+      TCNT1 = OCR1A-1;
 }

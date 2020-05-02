@@ -86,7 +86,7 @@ const unsigned int SOLENOID_MIN_DELAY = 1000; //ms
 // Lasers
 #define GOAL_ROBOT 8
 #define GOAL_HUMAN 10
-#define GOAL_MIN_DELAY 2000
+#define GOAL_MIN_DELAY 4000
 #define GOAL_SUM_AMOUNT 2
 
 // Steppers pins
@@ -107,8 +107,8 @@ int Tim3_multiplier = 0;
 uint16_t Tim3_res_comp = 0;
 
 //Timer4 constants
-#define RASPBERRY_DATA_LAG 100
-#define OCR4B_value 10
+#define RASPBERRY_DATA_LAG 10
+#define OCR4B_value 100
 
 
 //Position
@@ -130,6 +130,6 @@ float realSpeedXY_mm[2] = {0,0};
 float speedToCompare[2] = {0,0};
 float realSpeed[2] = {0,0};
 int direct[2] = {0, 0}; //1 = CCW, -1 = CW
-
-#define NOT_DEFINED 555
-int lastdirect[2] = {NOT_DEFINED, NOT_DEFINED};
+//bool changing_dir[2] = {false, false};
+//#define NOT_DEFINED 555
+int dir_state[2];

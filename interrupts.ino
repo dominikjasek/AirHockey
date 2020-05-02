@@ -12,7 +12,7 @@ void checkGoal()  {
         }
       }
     }
-    if (digitalRead(GOAL_HUMAN) == LOW) {
+    else if (digitalRead(GOAL_HUMAN) == LOW) {
       int i = 0;
       while (digitalRead(GOAL_HUMAN) == LOW)  {
         if (++i == GOAL_SUM_AMOUNT)  {
@@ -114,24 +114,12 @@ ISR(TIMER1_COMPA_vect)  { //Timer for motor 1
     return;
 
   if(Tim1_count >= Tim1_multiplier)  {
-    //SET(PORTC, PUL2); // STEP X-AXIS (MOTOR1)
+    /*if (changing_dir[1])  {
+      Serial.println("motor 1 changing direction iterrupted by doing step");
+    }*/
     PORTC|=(1<<PUL2);
     pos_stepper[1] += direct[1];
     __asm__ __volatile__ (
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
     "nop" "\n\t"
     "nop" "\n\t"
     "nop" "\n\t"
@@ -166,19 +154,12 @@ ISR(TIMER3_COMPA_vect)  { //Timer for motor 0
     return;
   
   if(Tim3_count >= Tim3_multiplier)  {
-    //SET(PORTD, PUL1); // STEP X-AXIS (MOTOR1)
+    /*if (changing_dir[0])  {
+      Serial.println("motor 0 changing direction iterrupted by doing step");
+    }*/
     PORTD|=(1<<PUL1);
     pos_stepper[0] += direct[0];
     __asm__ __volatile__ (
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
-    "nop" "\n\t"
     "nop" "\n\t"
     "nop" "\n\t"
     "nop" "\n\t"
@@ -210,7 +191,6 @@ ISR(TIMER3_COMPA_vect)  { //Timer for motor 0
 
 void sendDataToRaspberry(bool enforced)  { //Timer for sending serial data
   static int sent[5] = {-1,0,0,0,0};
-  //interrupts (); //alow other (motor) interrupts
   if (error && !error_printed && !homing_state)  {
     if (error_drivers) {
       //Serial.println("e2");
