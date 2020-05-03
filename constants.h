@@ -41,7 +41,7 @@ unsigned int Kp;
 const unsigned long ACCEL_PER1SEC_DEF = 20000; //acceleration per 1 second
 const int MM_SPEED_DEF = 2000; //mm per second
 const int Kp_DEF = 20; //P regulator
-const int DECEL_GAIN_DEF = 5;
+const int DECEL_GAIN_DEF = 1;
 
 // Boundaries
 #define MAX_ALLOWED_ACCEL 200
@@ -121,6 +121,7 @@ volatile float pos_Y = 0;
 
 // Speed variables
 bool preventWallHit = false;
+bool preventWallHit_printed = false;
 bool allowedSpeed[2] = {false,false};
 bool changed[2] = {false,false};
 const int initial_speed = 0; 

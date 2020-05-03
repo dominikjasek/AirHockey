@@ -39,19 +39,22 @@ void errorTrigger()  {
 
 void checkDriverError() {  
   // check if error has occured
-  if (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1)) && !error_drivers) {
-    int i = 0;
-    while (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1))) {  // && !error_drivers
-      if (++i >= INDUCTION_DRIVER_SWITCH)  {
-        error_drivers = true;
-        errorTrigger();
-        Serial.println("Driver error...");
-        return;
+  if (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1))) {
+    Serial.println("going to check drivers");
+    if (!error_drivers) {
+      int i = 0;
+      while (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1))) {  // && !error_drivers
+        if (++i >= INDUCTION_DRIVER_SWITCH)  {
+          error_drivers = true;
+          errorTrigger();
+          //Serial.println("Driver error...");
+          return;
+        }
       }
     }
   }
   // check if error has been dismissed
-  else  {
+  else {
     error_drivers = false;
   }
 }
@@ -193,7 +196,7 @@ void sendDataToRaspberry(bool enforced)  { //Timer for sending serial data
   static int sent[5] = {-1,0,0,0,0};
   if (error && !error_printed && !homing_state)  {
     if (error_drivers) {
-      //Serial.println("e2");
+      Serial.println("e2");
     }
     else {
       Serial.println("e1");

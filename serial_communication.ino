@@ -9,7 +9,7 @@ char motors_keyword[]  = "m";
 char preg_keyword[]  = "kpgain";
 char default_keyword[]  = "default";
 char set_acceleration_keyword[]  = "setaccel";
-char set_decelgain_keyword[]  = "setdecelgain";
+char set_decel_keyword[]  = "setdecel";
 char set_maxspeed_keyword[]  = "setmaxspeed";
 char preventwallhit_keyword[]  = "preventwallhit";
 char led_keyword[] = "leds";
@@ -75,10 +75,10 @@ void checkSerialInput() {
         float acc = atof(strtokIndx);  //convert string to integer
         setAccel(acc);  
       }
-      else if (strcmp(strtokIndx,set_decelgain_keyword) == 0) {
+      else if (strcmp(strtokIndx,set_decel_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
         const int d = atoi(strtokIndx);  //convert string to integer
-        setDecel(d);  
+        setDecel();  
       }
       else if (strcmp(strtokIndx,set_maxspeed_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
@@ -207,18 +207,20 @@ void setAccel(float _accel_per1sec) {
       //Serial.println("ACCEL_PER1SEC = " + String(ACCEL_PER1SEC));
       _accel_per1sec*=0.5;  //h-bot construction;
       ACCEL = mmToSteps((float)((_accel_per1sec*CYCLE_DURATION)/1000000.0));
-      //Serial.print("Setting accelertion = ");
-      //Serial.println(ACCEL, 4);
-      pickCoefficients();
+      Serial.print("Setting accelertion = ");
+      Serial.println(ACCEL);
+
+      //this should be deleted !!!!!!!!!!!!!!!!!!!!!!!!!!!
+      setDecel();
   }
   else 
     Serial.println("Acceleration must be greater than 0 and lower than " + String(MAX_ALLOWED_ACCEL_PER1SEC));
 }
 
-void setDecel(int _DECEL_GAIN) {
-  DECEL_GAIN = _DECEL_GAIN;
-  DECEL = DECEL_GAIN * ACCEL;
+void setDecel() {
+  DECEL = ACCEL*2;
   Serial.println("DECEL set to " + String(DECEL));
+  pickCoefficients(ACCEL_PER1SEC*2);
 }
 
 void setMaximalSpeed(float _maxspeed) {

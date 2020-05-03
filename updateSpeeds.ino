@@ -140,7 +140,7 @@ void updatePositionSpeeds() {
 
 void setDefaultParams() {
   setAccel(ACCEL_PER1SEC_DEF);
-  setDecel(DECEL_GAIN_DEF);
+  setDecel();
   setMaximalSpeed(MM_SPEED_DEF);
   setKpGain(Kp_DEF);
 }
@@ -232,15 +232,32 @@ void preventWallCollision() {
   }  
 }
 
+bool decelerating(int i) {  //return true if motor i is decelerating
+  if (abs(desiredSpeed[i]) < 5)  {  //desired value is fluctuating around zero
+    return true;
+  }  
+  if (oppositeSigns(desiredSpeed[i], realSpeed[i])) { //desired speed has opposite sign
+    return true;
+  }
+  else if (abs(desiredSpeed[i]) < abs(realSpeed[i])) { // desired speed has same sign as real but is lower
+    return true;
+  }  
+  return false;
+}
+
 /*===========================================================================================*/
 void updateRealSpeeds() {   
-  
   if (positionControl && !positionReached) { //positionControl 
       updatePositionSpeeds();
   }
 
   if (!homing_state && preventWallHit)  {
     preventWallCollision();
+    preventWallHit_printed = true;
+  }
+  else if (preventWallHit_printed)  {
+    Serial.println("wall collision passed");
+    preventWallHit_printed = false;
   }
   
   //float accel[2];
@@ -250,17 +267,23 @@ void updateRealSpeeds() {
   speedToCompare[0] = realSpeed[0];
   speedToCompare[1] = realSpeed[1];
 
-  float higher_diff = (abs(speed_diff[0]) > abs(speed_diff[1])) ? (abs(speed_diff[0])) : (abs(speed_diff[1]));
-
   //pick acceleration in depending on acceleration/deceleration
   float ACCEL_PICKED;
-  if (!oppositeSigns(desiredSpeed[0], realSpeed[0]) && !oppositeSigns(desiredSpeed[1], realSpeed[1]) && abs(desiredSpeed[0]) >= abs(realSpeed[0]) && abs(desiredSpeed[1]) >= abs(realSpeed[1])) {
-    ACCEL_PICKED = ACCEL;
-  }
-  else { 
+  ACCEL_PICKED = ACCEL;
+  /*if (decelerating(0) && decelerating(1)) {
     ACCEL_PICKED = DECEL;
   }
-  
+  else { 
+    ACCEL_PICKED = ACCEL;
+  }*/
+
+  //higher diff for clamping
+  float higher_diff = (abs(speed_diff[0]) > abs(speed_diff[1])) ? (abs(speed_diff[0])) : (abs(speed_diff[1]));
+  /*if (realSpeed[0] != 0 && desiredSpeed[0] != 0)  {
+    print_real_speeds();
+    print_desired_speeds();
+  }*/
+
   for (int i = 0; i < 2; i++) {
     if (abs(speed_diff[i]) > SPEED_TO_UPDATE) {
       const int speed_diff_sgn = sgn(speed_diff[i]);
@@ -268,14 +291,13 @@ void updateRealSpeeds() {
       //if both motors are accelerating:
       float accel = mapf(speed_diff[i],0 ,speed_diff_sgn*higher_diff, 0, speed_diff_sgn*ACCEL_PICKED);
 
-      // if atleast one of motors is decelerating, use decelration value for it
+      // if atleast one of motors is decelerating, use deceleration value for it
       
       //Serial.println("accel " + String(i) + " = " + String(accel));
       
       if (abs(speed_diff[i]) < abs(accel + SPEED_TO_UPDATE)) {   // we are roughly on desired speed -> set directly desired speed
         realSpeed[i] = desiredSpeed[i];
-      }
-      
+      }      
       else  {
         realSpeed[i] += accel; 
       }

@@ -8,12 +8,13 @@ double p40;
 double p31;
 double p22;
 
-void pickCoefficients()  {
-  switch ((int)ACCEL_PER1SEC)
+void pickCoefficients(unsigned int decel)  {
+  Serial.println("Picking braking coefficients for decelper1sec = " + String(decel));
+  switch (decel)
     {
       case (30000):
-        //Serial.println("Coefficient for a = 30000 mms^-2 were chosen.");
-        offset = 300;  //mm
+        Serial.println("Coefficient for a = 30000 mms^-2 were chosen.");
+        offset = 320;  //mm
         p10 = 0.07017;
         p20 = 0.00006;
         p11 = -0.0003183;
@@ -24,7 +25,7 @@ void pickCoefficients()  {
         p22 = -0.000000000006265;
         break;      
       case (10000):
-        //Serial.println("Coefficient for a = 10000 mms^-2 were chosen.");
+        Serial.println("Coefficient for a = 10000 mms^-2 were chosen.");
         offset = 260;
         p10 = -0.003314;
         p20 = 0.0002464;
@@ -36,8 +37,8 @@ void pickCoefficients()  {
         p22 = -0.00000000004315;
         break;
       case (20000):
-        //Serial.println("Coefficient for a = 20000 mms^-2 were chosen.");
-        offset = 260;      
+        Serial.println("Coefficient for a = 20000 mms^-2 were chosen.");
+        offset = 300;      
         p10 = 0.01793;
         p20 = 0.0001257;
         p11 = -0.0003948;
@@ -49,7 +50,7 @@ void pickCoefficients()  {
         break;
       case (5000):
         Serial.println("Coefficient for a = 5000 mms^-2 were chosen.");
-        offset = 290;      
+        offset = 300;      
         p10 = 0.439;
         p20 = -0.00005849;
         p11 = -0.002195;
@@ -72,8 +73,8 @@ void pickCoefficients()  {
         p22 = -0.00000000002341;
         break;
       case (25000):
-        //Serial.println("Coefficient for a = 25000 mms^-2 were chosen.");
-        offset = 260;      
+        Serial.println("Coefficient for a = 25000 mms^-2 were chosen.");
+        offset = 400;      
         p10 = 0.01676;
         p20 = 0.0001033;
         p11 = -0.000324;
