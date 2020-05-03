@@ -128,7 +128,7 @@ void updatePositionSpeeds() {
   if (error < POSITION_ERROR_TOLERANCE)  {
     //Serial.println("We reached the target");
     setDesiredSpeedsXY(0,0);
-    positionReached = true;
+    //positionReached = true;
   }
   else  {
     float v_x = Kp*diff_x;
@@ -269,13 +269,13 @@ void updateRealSpeeds() {
 
   //pick acceleration in depending on acceleration/deceleration
   float ACCEL_PICKED;
-  ACCEL_PICKED = ACCEL;
-  /*if (decelerating(0) && decelerating(1)) {
+  //ACCEL_PICKED = ACCEL;
+  if (decelerating(0) && decelerating(1)) {
     ACCEL_PICKED = DECEL;
   }
   else { 
     ACCEL_PICKED = ACCEL;
-  }*/
+  }
 
   //higher diff for clamping
   float higher_diff = (abs(speed_diff[0]) > abs(speed_diff[1])) ? (abs(speed_diff[0])) : (abs(speed_diff[1]));
