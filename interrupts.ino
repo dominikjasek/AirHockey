@@ -39,8 +39,8 @@ void errorTrigger()  {
 
 void checkDriverError() {  
   // check if error has occured
-  if (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1))) {
-    Serial.println("going to check drivers");
+  if ((!digitalRead(DRIVER_FLT_0)) || (!digitalRead(DRIVER_FLT_1))) {
+    //Serial.println("going to check drivers");
     if (!error_drivers) {
       int i = 0;
       while (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1))) {  // && !error_drivers
@@ -192,8 +192,8 @@ ISR(TIMER3_COMPA_vect)  { //Timer for motor 0
   }
 }
 
-void sendDataToRaspberry(bool enforced)  { //Timer for sending serial data
-  static int sent[5] = {-1,0,0,0,0};
+void sendDataToRaspberry(bool print_home_status)  { //Timer for sending serial data
+  static int sent[5] = {0,0,0,0,-1};
   if (error && !error_printed && !homing_state)  {
     if (error_drivers) {
       Serial.println("e2");
@@ -203,9 +203,15 @@ void sendDataToRaspberry(bool enforced)  { //Timer for sending serial data
     }
     error_printed = true;
   }
-  else if ((int)homed != sent[0] || (int)pos_X != sent[1] || (int)pos_Y != sent[2] || (int)realSpeedXY_mm[0] != sent[3] || (int)realSpeedXY_mm[1] != sent[4] || enforced) {
-    sent[0] = (int)homed; sent[1] = (int)pos_X; sent[2] = (int)pos_Y; sent[3] = (int)realSpeedXY_mm[0]; sent[4] = (int)realSpeedXY_mm[1];
-    Serial.println(String(sent[0]) + ";" + String(sent[1]) + "," + String(sent[2]) + ";" + String(sent[3]) + "," + String(sent[4]));
+  if ((int)pos_X != sent[0] || (int)pos_Y != sent[1] || (int)realSpeedXY_mm[0] != sent[2] || (int)realSpeedXY_mm[1] != sent[3] || print_home_status) {
+    sent[0] = (int)pos_X; sent[1] = (int)pos_Y; sent[2] = (int)realSpeedXY_mm[0]; sent[3] = (int)realSpeedXY_mm[1];
+    if (print_home_status)  {
+      sent[4] = (int)homed; 
+      Serial.println(String(sent[0]) + "," + String(sent[1]) + ";" + String(sent[2]) + "," + String(sent[3]) + ";" + String(sent[4]));
+    }
+    else  {
+      Serial.println(String(sent[0]) + "," + String(sent[1]) + ";" + String(sent[2]) + "," + String(sent[3]));
+    }
   }
 }
 
@@ -214,7 +220,12 @@ ISR(TIMER4_COMPB_vect)  {
   checkGoal();
   static int i = 0;
   if (++i >= RASPBERRY_DATA_LAG) {
-    sendDataToRaspberry(false);
+    if (homing_state) {
+      sendDataToRaspberry(true);
+    }
+    else  {
+      sendDataToRaspberry(false);
+    }
     i = 0;
   }
   TCNT4=0;

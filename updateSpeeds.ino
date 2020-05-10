@@ -49,7 +49,8 @@ void updateRealSpeedXY_mm() {
 }
 
 void setDesiredSpeedsMotors(float v0, float v1)  {
-  if (error) {
+  if (error && !homing_state) {
+    Serial.println("catch error in update speeds");
      sendDataToRaspberry(true);
   }
   desiredSpeed[0]= v0;

@@ -3,7 +3,7 @@
 
 // Constant duration of loop()
 unsigned long t = 0;
-#define CYCLE_DURATION 2100  //us
+#define CYCLE_DURATION 1800  //us
 
 //Barriers
 const uint8_t OFFSET_X = 12;
@@ -110,7 +110,7 @@ int Tim3_multiplier = 0;
 uint16_t Tim3_res_comp = 0;
 
 //Timer4 constants
-#define RASPBERRY_DATA_LAG 10
+#define RASPBERRY_DATA_LAG 5
 #define OCR4B_value 100
 
 

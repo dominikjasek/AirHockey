@@ -218,9 +218,9 @@ void setAccel(float _accel_per1sec) {
 }
 
 void setDecel() {
-  DECEL = ACCEL*2;
+  DECEL = ACCEL*3;
   Serial.println("DECEL set to " + String(DECEL));
-  pickCoefficients(ACCEL_PER1SEC*2);
+  pickCoefficients(ACCEL_PER1SEC*3);
 }
 
 void setMaximalSpeed(float _maxspeed) {

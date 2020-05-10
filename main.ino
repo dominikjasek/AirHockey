@@ -131,7 +131,7 @@ void loop() {
   } 
   //Serial.println(micros()-t2);  
   if (micros()-t >= CYCLE_DURATION)  {
-    //Serial.println("Cycle took longer time than cycle_duration: " + String(micros()-t));
+    Serial.println("Loop took more: " + String(micros()-t));
   }
   else {
     while(micros()-t < CYCLE_DURATION){}  //wait for cycle to be time-equidistant 
