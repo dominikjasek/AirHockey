@@ -1,5 +1,7 @@
 # Air Hockey Robot
 
+Master thesis at BUT Brno. All hardware is done DIY.
+
 MCU: Arduino Micro
 
 Stepper motors: 57HS22
@@ -12,7 +14,6 @@ Drivers: Leadshine EM705
 ![Electrical scheme](https://forum.fritzing.org/uploads/default/original/2X/1/11f5bfa0068bde8bf12138e5796b8593362be0a9.png)
 
 
-Master thesis at BUT Brno. All hardware is done DIY.
 
 # Cooperating project
 
