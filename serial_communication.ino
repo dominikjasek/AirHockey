@@ -15,7 +15,6 @@ char preventwallhit_keyword[]  = "preventwallhit";
 char led_keyword[] = "leds";
 char fan[] = "fans";
 char solenoid[] = "solenoid";
-int control_mode = 3;
 char recievedChar;
 char * strtokIndx;
 char buf[20];
@@ -30,7 +29,8 @@ void checkSerialInput() {
   }
   if ((buf[0] != NULL)) {
       // credit: https://forum.arduino.cc/index.php?topic=288234.0
-      strtokIndx  = strtok(buf,",");  //parse buf into part ending with ","
+      strtokIndx  = strtok(buf,",");  //parse buf into part ending with ",")
+      Serial.println("Timestamp = " + String(millis()));
       
       if (strcmp(strtokIndx,home_keyword) == 0) {
         //Serial.println("going to homing");
@@ -77,8 +77,8 @@ void checkSerialInput() {
       }
       else if (strcmp(strtokIndx,set_decel_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
-        const int d = atoi(strtokIndx);  //convert string to integer
-        setDecel();  
+        const float deccel = atof(strtokIndx);  //convert string to integer
+        setDecel(deccel);  
       }
       else if (strcmp(strtokIndx,set_maxspeed_keyword) == 0) {
         strtokIndx = strtok(NULL, ","); //parse same strtokIndx
@@ -209,18 +209,21 @@ void setAccel(float _accel_per1sec) {
       ACCEL = mmToSteps((float)((_accel_per1sec*CYCLE_DURATION)/1000000.0));
       Serial.print("Setting accelertion = ");
       Serial.println(ACCEL);
-
-      //this should be deleted !!!!!!!!!!!!!!!!!!!!!!!!!!!
-      setDecel();
   }
   else 
     Serial.println("Acceleration must be greater than 0 and lower than " + String(MAX_ALLOWED_ACCEL_PER1SEC));
 }
 
-void setDecel() {
-  DECEL = ACCEL*3;
-  Serial.println("DECEL set to " + String(DECEL));
-  pickCoefficients(ACCEL_PER1SEC*3);
+void setDecel(float _decel_per1sec) {
+  if (_decel_per1sec > 0) {
+      DECEL_PER1SEC = _decel_per1sec;
+      _decel_per1sec*=0.5;  //h-bot construction;
+      DECEL = mmToSteps((float)((_decel_per1sec*CYCLE_DURATION)/1000000.0));
+      Serial.print("Setting decelertion = ");
+      Serial.println(DECEL);
+  }
+  else 
+    Serial.println("Deceleration must be greater than 0");
 }
 
 void setMaximalSpeed(float _maxspeed) {
@@ -277,6 +280,11 @@ void print_real_speedsXY()  {
 void print_desired_speeds()  {
   Serial.print("Desired speeds: ");
   Serial.println(String(desiredSpeed[0]) + " " + String(desiredSpeed[1]));
+}
+
+void print_accels() {
+  Serial.print("Accels: ");
+  Serial.println(String(desiredAccel[0]) + " " + String(desiredAccel[1]));
 }
 
 void print_error()  {

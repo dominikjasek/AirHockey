@@ -3,7 +3,9 @@
 
 // Constant duration of loop()
 unsigned long t = 0;
-#define CYCLE_DURATION 1800  //us
+int BASE_CYCLE_DURATION = 2400;
+const int FAST_CYCLE_DURATION = 0.65*BASE_CYCLE_DURATION;
+int CYCLE_DURATION = BASE_CYCLE_DURATION;
 
 //Barriers
 const uint8_t OFFSET_X = 12;
@@ -16,7 +18,7 @@ const float BARRIER_Y_MAX = 300 - PUSHER_RADIUS - OFFSET_Y;
 const float START_Y = BARRIER_Y_MAX;
 const float START_X = BARRIER_X_MIN;
 const int INDUCTION_CONSTANT_SWITCH = 2; //due to current in motors, there is inductive current in microswitch and thus we are searching for 2 consecutive events when switch stays constant and doesnt jump
-const int INDUCTION_DRIVER_SWITCH = 10; //due to current in motors, there is inductive current in microswitch and thus we are searching for 2 consecutive events when switch stays constant and doesnt jump
+const int INDUCTION_DRIVER_SWITCH = 3; //due to current in motors, there is inductive current in microswitch and thus we are searching for 2 consecutive events when switch stays constant and doesnt jump
 
 bool error = true;
 bool error_drivers = false;
@@ -30,7 +32,7 @@ const float HBOT_CONSTANT = mmPerRev/stepsPerRev; //mm->steps means divide, step
 
 // Speed variables
 float ACCEL_PER1SEC;  //accel for axis per 1 second
-unsigned int DECEL_GAIN;
+float DECEL_PER1SEC;  //accel for axis per 1 second
 float DECEL;
 float ACCEL;  //accel for motor in steps per cycle
 float MM_SPEED;
@@ -38,10 +40,10 @@ float MAX_MOTOR_SPEED;
 unsigned int Kp;
 
 // Default values
-const unsigned long ACCEL_PER1SEC_DEF = 20000; //acceleration per 1 second
-const int MM_SPEED_DEF = 2000; //mm per second
-const int Kp_DEF = 20; //P regulator
-const int DECEL_GAIN_DEF = 1;
+const unsigned long ACCEL_PER1SEC_DEF = 33000; //acceleration per 1 second
+const unsigned long DECEL_PER1SEC_DEF = 60000; //deceleration per 1 second
+const int MM_SPEED_DEF = 3000; //mm per second
+const int Kp_DEF = 35; //P regulator
 
 // Boundaries
 #define MAX_ALLOWED_ACCEL 200
@@ -52,6 +54,7 @@ const int DECEL_GAIN_DEF = 1;
 
 const unsigned int SPEED_TO_UPDATE = 0.3; //speed lower than this difference is ignored and not updated
 const float POSITION_ERROR_TOLERANCE = 1.5; //must be greater than 0!!!
+const unsigned int FLUCTUATION_DEVIATION = 4;
 
 //Driver fault
 #define DRIVER_FLT_0 A2
@@ -110,7 +113,7 @@ int Tim3_multiplier = 0;
 uint16_t Tim3_res_comp = 0;
 
 //Timer4 constants
-#define RASPBERRY_DATA_LAG 5
+#define RASPBERRY_DATA_LAG 8
 #define OCR4B_value 100
 
 
@@ -118,9 +121,13 @@ uint16_t Tim3_res_comp = 0;
 volatile float pos_stepper[2] = {0,0};
 volatile float pos_X = 0;
 volatile float pos_Y = 0;
+volatile float pos_braking_X = 0;
+volatile float pos_braking_Y = 0;
+const float BRAKING_OFFSET = 300;
+bool caution_braking = false;
 
 // Speed variables
-bool preventWallHit = false;
+bool preventWallHit = true;
 bool preventWallHit_printed = false;
 bool allowedSpeed[2] = {false,false};
 bool changed[2] = {false,false};
@@ -130,6 +137,9 @@ bool positionControl = false;
 bool positionReached = false;
 float desiredPosition[2] = {START_X,START_Y};
 float desiredSpeed[2] = {0,0};
+float _desiredSpeedToPass[2];
+float desiredAccel[2];
+float desiredBrakingAccel[2];
 float realSpeedXY_mm[2] = {0,0};
 float speedToCompare[2] = {0,0};
 float realSpeed[2] = {0,0};

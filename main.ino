@@ -11,17 +11,17 @@
 #include "constants.h"
 
 /*--------------------------------------------------------------------------------------*/
-float mmToSteps(float mm) {
+float mmToSteps(const float mm) {
   return mm/HBOT_CONSTANT;
 }
 
-float stepsTomm(float steps)  {
+float stepsTomm(const float steps)  {
   return steps*HBOT_CONSTANT;
 }
 
-void evaluatePos()  {
-  pos_X = START_X + stepsTomm(-pos_stepper[0] + pos_stepper[1]);
-  pos_Y = START_Y + stepsTomm(-pos_stepper[0] - pos_stepper[1]);
+void evaluatePos(const volatile float _steps0, const volatile float _steps1, volatile float& _pos_X, volatile float& _pos_Y)  {
+  _pos_X = START_X + stepsTomm(-_steps0 + _steps1);
+  _pos_Y = START_Y + stepsTomm(-_steps0 - _steps1);
 }
 
 /*--------------------------------------------------------------------------------------*/
@@ -115,7 +115,7 @@ void setup() {
   delay(50);  
 
   setDefaultParams();
-  delay(2000); 
+  delay(1000); 
   Serial.println("restarted");
 }
 
@@ -124,7 +124,7 @@ void setup() {
 void loop() {
   //Serial.println("FLT_0 = " + String(digitalRead(DRIVER_FLT_0)) + " FLT_1 = " + String(digitalRead(DRIVER_FLT_1)));
   checkSerialInput();
-  evaluatePos();
+  evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
   checkDriverError();
   if (!error) {
     updateRealSpeeds();

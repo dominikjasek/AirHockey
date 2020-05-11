@@ -12,7 +12,6 @@ bool stepsToComp(float steps, int& Tim_multiplier, uint16_t& Tim_res_comp)  {
 }
 
 
-
 void resetDirections()  {
   //const int PIN_DIR = (motor_index == 0)? (DIR1) : (DIR2);
   PORTD |= (1 << DIR1);
@@ -25,8 +24,16 @@ void resetDirections()  {
   dir_state[1] = 1;
 }
 
-void setDesiredSpeedsXY(float v_x, float v_y)  {  
-  float v0 = mmToSteps(0.5*(-v_x - v_y));
+void setDesiredSpeedsXY(float v_x, float v_y)  { 
+  _desiredSpeedToPass[0] = mmToSteps(0.5*(-v_x - v_y));
+  _desiredSpeedToPass[1] = mmToSteps(0.5*(v_x - v_y));
+  if(abs(_desiredSpeedToPass[0])>MAX_MOTOR_SPEED || abs(_desiredSpeedToPass[1]) > MAX_MOTOR_SPEED)  {
+    scaleToMaxMotorValues(_desiredSpeedToPass[0], _desiredSpeedToPass[1], MAX_MOTOR_SPEED, MAX_MOTOR_SPEED, _desiredSpeedToPass[0], _desiredSpeedToPass[1]);
+    //Serial.println("clamping desired speeds");
+  }
+  setDesiredSpeedsMotors(_desiredSpeedToPass[0],_desiredSpeedToPass[1]);
+  
+  /*float v0 = mmToSteps(0.5*(-v_x - v_y));
   float v1 = mmToSteps(0.5*(v_x - v_y));
   
   //clamp by MAX_SPEED
@@ -38,7 +45,7 @@ void setDesiredSpeedsXY(float v_x, float v_y)  {
     v1 = mapf(v1,-bigger,bigger, -MAX_MOTOR_SPEED, MAX_MOTOR_SPEED);
     //Serial.println("Clamped: v0 = " + String(v0) + ", v = " + String(v1));
   }    
-  setDesiredSpeedsMotors(v0,v1);
+  setDesiredSpeedsMotors(v0,v1);*/
 }
 
 void updateRealSpeedXY_mm() {
@@ -50,8 +57,8 @@ void updateRealSpeedXY_mm() {
 
 void setDesiredSpeedsMotors(float v0, float v1)  {
   if (error && !homing_state) {
-    Serial.println("catch error in update speeds");
-     sendDataToRaspberry(true);
+     //Serial.println("catch error in update speeds");
+     sendDataToRaspberry();
   }
   desiredSpeed[0]= v0;
   desiredSpeed[1]= v1;
@@ -82,7 +89,7 @@ void waitUntilPosReached(float x, float y) {
 }
 
 void setDesiredPosition(float x, float y)  {
-  if (x < BARRIER_X_MAX -3 && x > BARRIER_X_MIN && y < BARRIER_Y_MAX && y > BARRIER_Y_MIN) {
+  if (x < BARRIER_X_MAX && x > BARRIER_X_MIN && y < BARRIER_Y_MAX && y > BARRIER_Y_MIN) {
     positionReached = false;
     positionControl=true;
     desiredPosition[0] = x;
@@ -141,127 +148,61 @@ void updatePositionSpeeds() {
 
 void setDefaultParams() {
   setAccel(ACCEL_PER1SEC_DEF);
-  setDecel();
+  setDecel(DECEL_PER1SEC_DEF);
   setMaximalSpeed(MM_SPEED_DEF);
   setKpGain(Kp_DEF);
 }
 
-double minDistToWall()  {
-  double x_hit; double y_hit; double tgAlpha;
-  tgAlpha = realSpeedXY_mm[1]/realSpeedXY_mm[0];
-  if (realSpeedXY_mm[0] >= 0) {    
-    //Serial.println("pos_Y = " + String(pos_Y));
-    //Serial.println("pos_X = " + String(pos_X));
-    double x0 = BARRIER_X_MAX - pos_X;
-    //Serial.println("x0 = " + String(x0));
-    //Serial.println("tgAlpha = " + String(tgAlpha));
-    double y0 = x0*tgAlpha;
-    //Serial.println("y0 = " + String(y0));
-    double y0_tot = y0 + pos_Y;
-    //Serial.println("y0_tot = " + String(y0_tot));
-    //Serial.println("------------");
-    if (isnan(y0_tot)) {
-      return 80000;
-    }
-    else if (y0_tot > BARRIER_Y_MAX) { //hitting upper X line
-      //Serial.println("upper");
-      y_hit = BARRIER_Y_MAX;
-      x_hit = BARRIER_X_MAX - (y0_tot - BARRIER_Y_MAX)/tgAlpha;
-    }
-    else if (y0_tot < BARRIER_Y_MIN)  { //hitting lower X line
-      //Serial.println("lower");
-      y_hit = BARRIER_Y_MIN;
-      x_hit = BARRIER_X_MAX - (y0_tot - BARRIER_Y_MIN)/tgAlpha;
-    }
-    else  { //hitting X_MAX line
-      //Serial.println("back");
-      x_hit = BARRIER_X_MAX;
-      y_hit = y0_tot;
-    }
-  }
-  else  {
-    double x0 = pos_X - BARRIER_X_MIN;
-    double y0 = -x0*tgAlpha;
-    double y0_tot = y0 + pos_Y;
-    //Serial.println("y0_tot = " + String(y0_tot));
-    //Serial.println("------------");
-    if (isnan(y0_tot)) {
-      return 80000;
-    }
-    else if (y0_tot > BARRIER_Y_MAX) { //hitting upper X line
-      //Serial.println("upper");
-      y_hit = BARRIER_Y_MAX;
-      x_hit = BARRIER_X_MIN - (y0_tot - BARRIER_Y_MAX)/tgAlpha;
-    }
-    else if (y0_tot < BARRIER_Y_MIN)  { //hitting lower X line
-      //Serial.println("lower");
-      y_hit = BARRIER_Y_MIN;
-      x_hit = BARRIER_X_MIN - (y0_tot - BARRIER_Y_MIN)/tgAlpha;
-    }
-    else  { //hitting X_MIN line
-      //Serial.println("front");
-      x_hit = BARRIER_X_MIN;
-      y_hit = y0_tot;
-    }
-  }
-  
-  if (isnan(x_hit)) 
-    x_hit = pos_X;
-
-  
-  double distToWall = distSqr(pos_X, pos_Y, x_hit, y_hit);
-  if (isnan(distToWall) || distToWall < 0) 
-    distToWall = 80000;
-    
-  //Serial.println("Intersect point = [" + String(x_hit) + ", " + String(y_hit) + "]");
-  //Serial.println("Dist to wall = " + String(distToWall));
-  
-  return distToWall;
-}
-
-double distSqr(double x1, double y1, double x2, double y2) {
-  return (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2);
-}
-
-void preventWallCollision() {
-  double critical_dist = criticalDist(realSpeed[0], realSpeed[1]);
-  double dist = minDistToWall();
-  if (critical_dist > dist) {
-    Serial.println("Critical distance. Setting speed to 0.");
-    setDesiredSpeedsXY(0,0);
-    positionControl = false;
-  }  
-}
-
-bool decelerating(int i) {  //return true if motor i is decelerating
-  if (abs(desiredSpeed[i]) < 5)  {  //desired value is fluctuating around zero
+bool isMotorDecelerating(float v_desired, float v_real) {  //return true if motor i is decelerating
+  if (abs(v_desired) < FLUCTUATION_DEVIATION)  {  //desired value is fluctuating around zero
     return true;
   }  
-  if (oppositeSigns(desiredSpeed[i], realSpeed[i])) { //desired speed has opposite sign
+  if (oppositeSigns(v_desired, v_real)) { //desired speed has opposite sign
     return true;
   }
-  else if (abs(desiredSpeed[i]) < abs(realSpeed[i])) { // desired speed has same sign as real but is lower
+  else if (abs(v_desired) < abs(v_real)) { // desired speed has same sign as real but is lower
     return true;
   }  
   return false;
 }
 
+float pickAccel(float v_desired, float v_real) {
+  return (isMotorDecelerating(v_desired, v_real))? (DECEL) : (ACCEL);
+}
+
+void scaleToMaxMotorValues(float v0_diff, float v1_diff, float max_value_0, float max_value_1, float& desiredValue0, float& desiredValue1)  {
+  if ((v0_diff == 0) || (v1_diff == 0)) {
+    desiredValue0 = (v0_diff == 0)? (0) : (sgn(v0_diff)*max_value_0);
+    desiredValue1 = (v1_diff == 0)? (0) : (sgn(v1_diff)*max_value_1); 
+  }  
+  else {
+    float multiplier0 = max_value_0 / abs(v0_diff);
+    float multiplier1 = max_value_1 / abs(v1_diff);
+    float multiplier = min(multiplier0, multiplier1);
+    desiredValue0 = v0_diff*multiplier;
+    desiredValue1 = v1_diff*multiplier;
+  }
+}
+
 /*===========================================================================================*/
 void updateRealSpeeds() {   
-  if (positionControl && !positionReached) { //positionControl 
+  // Calculate new desired speeds
+  if (positionControl && positionControl && !positionReached && !caution_braking) { //positionControl 
       updatePositionSpeeds();
   }
 
+  // Prevent wall hit
   if (!homing_state && preventWallHit)  {
-    preventWallCollision();
-    preventWallHit_printed = true;
-  }
-  else if (preventWallHit_printed)  {
-    Serial.println("wall collision passed");
-    preventWallHit_printed = false;
+    if (!caution_braking) {
+      preventWallCollision();
+    }
+    else if (realSpeed[0] == 0 && realSpeed[1] == 0)  {
+      caution_braking = false;
+      CYCLE_DURATION = BASE_CYCLE_DURATION;
+    }
   }
   
-  //float accel[2];
+  // update real speeds
   float speed_diff[2];
   speed_diff[0] = desiredSpeed[0] - realSpeed[0];
   speed_diff[1] = desiredSpeed[1] - realSpeed[1];  
@@ -269,42 +210,23 @@ void updateRealSpeeds() {
   speedToCompare[1] = realSpeed[1];
 
   //pick acceleration in depending on acceleration/deceleration
-  float ACCEL_PICKED;
-  //ACCEL_PICKED = ACCEL;
-  if (decelerating(0) && decelerating(1)) {
-    ACCEL_PICKED = DECEL;
-  }
-  else { 
-    ACCEL_PICKED = ACCEL;
-  }
-
-  //higher diff for clamping
-  float higher_diff = (abs(speed_diff[0]) > abs(speed_diff[1])) ? (abs(speed_diff[0])) : (abs(speed_diff[1]));
-  /*if (realSpeed[0] != 0 && desiredSpeed[0] != 0)  {
-    print_real_speeds();
-    print_desired_speeds();
-  }*/
-
+  float accel_picked[2];
+  accel_picked[0] = pickAccel(desiredSpeed[0], realSpeed[0]); accel_picked[1] = pickAccel(desiredSpeed[1], realSpeed[1]);
+  scaleToMaxMotorValues(speed_diff[0], speed_diff[1], accel_picked[0], accel_picked[1], desiredAccel[0], desiredAccel[1]);
+  /*print_real_speeds();
+  print_desired_speeds();
+  print_accels();*/
+  
   for (int i = 0; i < 2; i++) {
     if (abs(speed_diff[i]) > SPEED_TO_UPDATE) {
-      const int speed_diff_sgn = sgn(speed_diff[i]);
-      
-      //if both motors are accelerating:
-      float accel = mapf(speed_diff[i],0 ,speed_diff_sgn*higher_diff, 0, speed_diff_sgn*ACCEL_PICKED);
-
-      // if atleast one of motors is decelerating, use deceleration value for it
-      
-      //Serial.println("accel " + String(i) + " = " + String(accel));
-      
-      if (abs(speed_diff[i]) < abs(accel + SPEED_TO_UPDATE)) {   // we are roughly on desired speed -> set directly desired speed
+      if (abs(speed_diff[i]) < abs(desiredAccel[i]) + SPEED_TO_UPDATE) {   // we are roughly on desired speed -> set directly desired speed
         realSpeed[i] = desiredSpeed[i];
       }      
       else  {
-        realSpeed[i] += accel; 
+        realSpeed[i] += desiredAccel[i]; 
       }
     }
   }
-  //print_real_speeds();
 }
 
 void applyRealSpeeds() {

@@ -87,7 +87,7 @@ void checkSwitchSlider2()  {
 void checkSwitchMotor()  {
   int i = 0;
   while (!bitRead(SWITCH_MOTOR_PIN,SWITCH_MOTOR_REGISTER_NUM) && !switch_motor) {
-    //Serial.println("motor");
+    Serial.println("motor");
     if (++i >= INDUCTION_CONSTANT_SWITCH)  {
       //Serial.println("motor switch");
       switch_motor = true;
@@ -192,7 +192,7 @@ ISR(TIMER3_COMPA_vect)  { //Timer for motor 0
   }
 }
 
-void sendDataToRaspberry(bool print_home_status)  { //Timer for sending serial data
+void sendDataToRaspberry()  { //Timer for sending serial data
   static int sent[5] = {0,0,0,0,-1};
   if (error && !error_printed && !homing_state)  {
     if (error_drivers) {
@@ -203,9 +203,9 @@ void sendDataToRaspberry(bool print_home_status)  { //Timer for sending serial d
     }
     error_printed = true;
   }
-  if ((int)pos_X != sent[0] || (int)pos_Y != sent[1] || (int)realSpeedXY_mm[0] != sent[2] || (int)realSpeedXY_mm[1] != sent[3] || print_home_status) {
+  if ((int)pos_X != sent[0] || (int)pos_Y != sent[1] || (int)realSpeedXY_mm[0] != sent[2] || (int)realSpeedXY_mm[1] != sent[3]) {
     sent[0] = (int)pos_X; sent[1] = (int)pos_Y; sent[2] = (int)realSpeedXY_mm[0]; sent[3] = (int)realSpeedXY_mm[1];
-    if (print_home_status)  {
+    if (!homed)  {
       sent[4] = (int)homed; 
       Serial.println(String(sent[0]) + "," + String(sent[1]) + ";" + String(sent[2]) + "," + String(sent[3]) + ";" + String(sent[4]));
     }
@@ -220,12 +220,7 @@ ISR(TIMER4_COMPB_vect)  {
   checkGoal();
   static int i = 0;
   if (++i >= RASPBERRY_DATA_LAG) {
-    if (homing_state) {
-      sendDataToRaspberry(true);
-    }
-    else  {
-      sendDataToRaspberry(false);
-    }
+      sendDataToRaspberry();
     i = 0;
   }
   TCNT4=0;

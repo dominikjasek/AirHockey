@@ -1,5 +1,5 @@
 void loopWithoutSerial()  {
-  evaluatePos();
+  evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
   checkDriverError();
   if (!error) {
     updateRealSpeeds();
@@ -12,14 +12,17 @@ void loopWithoutSerial()  {
 void homing()  {
   const float mm_speed_restore = MM_SPEED;
   const float accel_per1sec_restore = ACCEL_PER1SEC; 
+  const float decel_per1sec_restore = DECEL_PER1SEC; 
   //Serial.println("mm_speed_restore = " + String(mm_speed_restore));
   //Serial.println("accel_restore = " + String(accel_per1sec_restore));
-  const int homing_speed = 150; //mm/s
+  const int homing_speed = 120; //mm/s
   const int accelper1sec = 1200; //mm/s^2
   setZeroSpeeds();
   delay(10);
   setMaximalSpeed(homing_speed);
   setAccel(accelper1sec);
+  setDecel(accelper1sec);
+  
   if (!error_drivers) {
     detachInterrupts();
     
@@ -27,7 +30,7 @@ void homing()  {
     //bool prev_positionControl = positionControl;  //turn off positionControl for homing
     positionControl = false;
     
-    if (switch_motor == true) { //pusher has hit motor switch, go forward a bit to prevent hitting corner of goal in case it is inside
+    if (switch_motor) { //pusher has hit motor switch, go forward a bit to prevent hitting corner of goal in case it is inside
       switch_motor = false;
       setDesiredSpeedsXY(homing_speed,0);
       error = false; 
@@ -73,13 +76,14 @@ void homing()  {
     setZeroSpeeds();
     setMaximalSpeed(mm_speed_restore);
     setAccel(accel_per1sec_restore);
+    setDecel(decel_per1sec_restore);
     resetDesiredPosition();
     attachInterrupts();
     error = false; switch_motor = false; switch_slider = false; switch_others = false; error_drivers = false;
     //Serial.println("Homing finished");
     homing_state = false;
     homed = true;
-    sendDataToRaspberry(true);
+    sendDataToRaspberry();
   }
   else  {
     Serial.println("There is an error in drivers. Please unplug the power from them, wait 5 seconds and try it again.");
