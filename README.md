@@ -2,6 +2,8 @@
 
 Master thesis at BUT Brno. All hardware is done DIY.
 
+TODO: video
+
 MCU: Arduino Micro
 
 Stepper motors: 57HS22
