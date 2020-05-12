@@ -10,6 +10,8 @@ Stepper motors: 57HS22
 
 Drivers: Leadshine EM705
 
+Model: https://a360.co/2I2ok0s
+
 
 # Electrical scheme
 
