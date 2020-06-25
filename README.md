@@ -2,7 +2,7 @@
 
 Master thesis at BUT Brno. All hardware is done DIY.
 
-TODO: video
+Video: https://youtu.be/TS3wz0Ixsf8
 
 MCU: Arduino Micro
 
