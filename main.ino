@@ -1,6 +1,6 @@
  /*
-  Author: Dominik Jašek, BUT BRNO 2020.
-  MCU: Arduino Micro CPU: ATmega32U4
+  Author: Dominik Jašek, @BUT BRNO 2020
+  MCU: Arduino Micro with CPU: ATmega32U4
   Driver: EM705
   Stepper: 57HS22-A
   Microstepping: 400 steps/rev
@@ -41,6 +41,7 @@ void setup() {
   
   // Led strip
   pinMode(LED_STRIP, OUTPUT);
+  pinMode(GOALLED_STRIP, OUTPUT);
   digitalWrite(LED_STRIP, LOW);
 
   // set end switches as input
@@ -104,9 +105,11 @@ void setup() {
   TCCR4B &= ~(1 << CS40);
   TCNT4 = 0;  //set counter to 0
   OCR4B = OCR4B_value;
-  //OCR4A = OCR4A_value;  // update realSpeed every 1ms
   TIMSK4 |= (1 << OCIE4B);   //allow timer4 interrupt
-  //TIMSK4 |= (1 << OCIE4A);   //allow timer4 interrupt
+
+  // Laser external interrupts
+  PCICR |= 0b00000001; // turn on port b
+  PCMSK0 |= 0b01010000; // turn on pins PB6 and PB4
 
   //Enable global interrupts
   sei();
@@ -122,14 +125,12 @@ void setup() {
 /*--------------------------------------------------------------------------------------*/
 
 void loop() {
-  //Serial.println("FLT_0 = " + String(digitalRead(DRIVER_FLT_0)) + " FLT_1 = " + String(digitalRead(DRIVER_FLT_1)));
   checkSerialInput();
   evaluatePos(pos_stepper[0], pos_stepper[1], pos_X, pos_Y);
   checkDriverError();
   if (!error) {
     updateRealSpeeds();
   } 
-  //Serial.println(micros()-t2);  
   if (micros()-t >= CYCLE_DURATION)  {
     Serial.println("Loop took more: " + String(micros()-t));
   }

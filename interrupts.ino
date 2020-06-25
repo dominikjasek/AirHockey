@@ -1,25 +1,40 @@
 void checkGoal()  {
   static unsigned long lastGoalTimestamp = 0;
+  static int checkFlagAllowed = true;
   //Serial.println("checking goal");
   if (millis()-lastGoalTimestamp > GOAL_MIN_DELAY)  {
-    if (digitalRead(GOAL_ROBOT) == LOW) {
-      int i = 0;
-      while (digitalRead(GOAL_ROBOT) == LOW)  {
-        if (++i == GOAL_SUM_AMOUNT)  {
-          Serial.println("gr");
-          lastGoalTimestamp = millis(); 
-          return;
+    if (checkFlagAllowed) {
+      if (digitalRead(GOAL_ROBOT) == LOW) {
+        int i = 0;
+        while (digitalRead(GOAL_ROBOT) == LOW)  {
+          if (++i == GOAL_SUM_AMOUNT)  {
+            Serial.println("gr");
+            lastGoalTimestamp = millis();
+            checkFlagAllowed = 2;
+            return;
+          }
+        }
+      }
+      else if (digitalRead(GOAL_HUMAN) == LOW) {
+        int i = 0;
+        while (digitalRead(GOAL_HUMAN) == LOW)  {
+          if (++i == GOAL_SUM_AMOUNT)  {
+            Serial.println("gh");
+            lastGoalTimestamp = millis(); 
+            checkFlagAllowed = 3;
+            return;
+          }
         }
       }
     }
-    else if (digitalRead(GOAL_HUMAN) == LOW) {
-      int i = 0;
-      while (digitalRead(GOAL_HUMAN) == LOW)  {
-        if (++i == GOAL_SUM_AMOUNT)  {
-          Serial.println("gh");
-          lastGoalTimestamp = millis(); 
-          return;
-        }
+    else if (checkFlagAllowed == 2) {
+      if (digitalRead(GOAL_ROBOT) == HIGH)  {
+        checkFlagAllowed = 1;
+      }
+    }
+    else if (checkFlagAllowed == 3) {
+      if (digitalRead(GOAL_HUMAN) == HIGH)  {
+        checkFlagAllowed = 1;
       }
     }
   }
@@ -45,17 +60,19 @@ void checkDriverError() {
       int i = 0;
       while (!(digitalRead(DRIVER_FLT_0)) || !(digitalRead(DRIVER_FLT_1))) {  // && !error_drivers
         if (++i >= INDUCTION_DRIVER_SWITCH)  {
-          error_drivers = true;
-          errorTrigger();
-          //Serial.println("Driver error...");
-          return;
+          if (!last_error_driver) {
+            error_drivers = true;
+            errorTrigger();
+            return;
+          }
         }
       }
     }
   }
   // check if error has been dismissed
   else {
-    error_drivers = false;
+    if (digitalRead(DRIVER_FLT_0) && digitalRead(DRIVER_FLT_1)) 
+      error_drivers = false;
   }
 }
 
@@ -109,6 +126,20 @@ void checkSwitchOthers()  {
       return;
     }
   }
+}
+
+void recordTimestamp0() {
+  for(int i = MEM_SIZE - 1 ; i >= 1; i--) {
+      signal_timestamp[i] = signal_timestamp[i-1];
+  }
+  signal_timestamp[0] = micros();
+}
+
+void printTimestamps0() {
+  Serial.println("LAST TIMESTAMPS");
+  for(int i = 0; i < MEM_SIZE; i++) {
+    Serial.println("_" + String(signal_timestamp[i]) + "_");
+  } 
 }
 
 ISR(TIMER1_COMPA_vect)  { //Timer for motor 1
@@ -181,6 +212,7 @@ ISR(TIMER3_COMPA_vect)  { //Timer for motor 0
     PORTD&=(~(1<<PUL1));
     Tim3_count = 0;
     OCR3A = (Tim3_multiplier == 0)? (Tim3_res_comp) : (65535);
+    //recordTimestamp0();
     return;
   }
   
@@ -197,10 +229,12 @@ void sendDataToRaspberry()  { //Timer for sending serial data
   if (error && !error_printed && !homing_state)  {
     if (error_drivers) {
       Serial.println("e2");
+      last_error_driver = true;
     }
     else {
       Serial.println("e1");
     }
+    //printTimestamps0();
     error_printed = true;
   }
   if ((int)pos_X != sent[0] || (int)pos_Y != sent[1] || (int)realSpeedXY_mm[0] != sent[2] || (int)realSpeedXY_mm[1] != sent[3]) {
@@ -217,11 +251,28 @@ void sendDataToRaspberry()  { //Timer for sending serial data
 
 ISR(TIMER4_COMPB_vect)  { 
   interrupts(); 
-  checkGoal();
+  //checkGoal();
+  static int blink_count = 0;
+  static int blink_nr = 0;
   static int i = 0;
   if (++i >= RASPBERRY_DATA_LAG) {
       sendDataToRaspberry();
     i = 0;
   }
+  if (blinking) {
+    if (++blink_count == BLINK_COUNT_MAX)  {
+      blinking_state = !blinking_state;
+      digitalWrite(GOALLED_STRIP,blinking_state);
+      blink_count=0;
+      if (++blink_nr == BLINK_NR) {
+        blinking = false;
+        blink_nr=0;
+      }
+    }
+  }
   TCNT4=0;
+}
+
+ISR(PCINT0_vect) {
+  checkGoal();
 }

@@ -13,6 +13,7 @@ char set_decel_keyword[]  = "setdecel";
 char set_maxspeed_keyword[]  = "setmaxspeed";
 char preventwallhit_keyword[]  = "preventwallhit";
 char led_keyword[] = "leds";
+char blink_keyword[] = "blink";
 char fan[] = "fans";
 char solenoid[] = "solenoid";
 char recievedChar;
@@ -30,7 +31,7 @@ void checkSerialInput() {
   if ((buf[0] != NULL)) {
       // credit: https://forum.arduino.cc/index.php?topic=288234.0
       strtokIndx  = strtok(buf,",");  //parse buf into part ending with ",")
-      Serial.println("Timestamp = " + String(millis()));
+      //Serial.println("Timestamp = " + String(millis()));
       
       if (strcmp(strtokIndx,home_keyword) == 0) {
         //Serial.println("going to homing");
@@ -131,6 +132,11 @@ void checkSerialInput() {
         int _value = atoi(strtokIndx);  //convert string to integer
         led(_value);
       }
+      else if (strcmp(strtokIndx,blink_keyword) == 0) {
+        int _value = atoi(strtokIndx);  //convert string to integer
+        blinking=true;
+        //_blink(_value);
+      }
       else {
         Serial.println("Bullshit: " + String(strtokIndx));
       }
@@ -200,6 +206,7 @@ void led(int _value)  {
   }
 }
 
+
 void setAccel(float _accel_per1sec) {
   //_accel_per1sec/=2.0;  //_accel_per1sec is acceleration for motor, not axis!!!!
   if (_accel_per1sec > 0) {
@@ -225,6 +232,17 @@ void setDecel(float _decel_per1sec) {
   else 
     Serial.println("Deceleration must be greater than 0");
 }
+
+//void _blink(int _value) {
+//  Serial.println("Blinking");
+//  for(int i = 0; i<9;i++) {
+//    digitalWrite(GOALLED_STRIP,HIGH);
+//    delay(50);
+//    digitalWrite(GOALLED_STRIP,LOW);
+//    delay(50);
+//  }
+//  Serial.println("Finished blinking");
+//}
 
 void setMaximalSpeed(float _maxspeed) {
   MM_SPEED = _maxspeed;

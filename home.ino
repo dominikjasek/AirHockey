@@ -13,8 +13,6 @@ void homing()  {
   const float mm_speed_restore = MM_SPEED;
   const float accel_per1sec_restore = ACCEL_PER1SEC; 
   const float decel_per1sec_restore = DECEL_PER1SEC; 
-  //Serial.println("mm_speed_restore = " + String(mm_speed_restore));
-  //Serial.println("accel_restore = " + String(accel_per1sec_restore));
   const int homing_speed = 120; //mm/s
   const int accelper1sec = 1200; //mm/s^2
   setZeroSpeeds();
@@ -83,6 +81,7 @@ void homing()  {
     //Serial.println("Homing finished");
     homing_state = false;
     homed = true;
+    last_error_driver = false;
     sendDataToRaspberry();
   }
   else  {
