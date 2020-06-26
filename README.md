@@ -15,7 +15,7 @@ Model: https://a360.co/2I2ok0s
 
 # Electrical scheme
 
-![Electrical scheme](https://forum.fritzing.org/uploads/default/original/2X/1/11f5bfa0068bde8bf12138e5796b8593362be0a9.png)
+![Electrical scheme](https://i.imgur.com/PcndZnz.png)
 
 
 
